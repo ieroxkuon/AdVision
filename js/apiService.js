@@ -1,13 +1,18 @@
 /**
  * =============================================================================
- * ADVISION AI - DỊCH VỤ KẾT NỐI TRÍ TUỆ NHÂN TẠO (AI API SERVICE)
+ * ADVISION AI - DỊCH VỤ KẾT NỐI MÔ HÌNH THỊ GIÁC NGÔN NGỮ (VLM API SERVICE)
  * =============================================================================
- * Đảm nhiệm giao tiếp với Google Gemini Vision API và OpenAI Vision API.
- * Tự động chuyển đổi các biến thể mô hình (fallbacks) khi gặp giới hạn tốc độ.
+ * Đảm nhiệm giao tiếp với Google Gemini Vision API (Mô hình chính: gemini-2.5-flash)
+ * và OpenAI Vision API (gpt-4o-mini).
+ * 
+ * CÔNG NGHỆ NHẬN DẠNG ĐẶC TRƯNG HÌNH ẢNH:
+ * - Tận dụng bộ mã hóa Vision Transformer (ViT) tích hợp trong VLM để chuyển đổi
+ *   ma trận điểm ảnh (pixel matrix) thành các véc-tơ đặc trưng ngữ nghĩa (multimodal embeddings).
+ * - Kết hợp tiền xử lý từ ImageFeatureExtractor để phân tích kích thước và tỷ lệ khung hình.
  */
 
 const ApiService = {
-  // 1. GỌI GEMINI VISION API ĐỂ THẨM ĐỊNH HÌNH ẢNH
+  // 1. GỌI GEMINI VISION API ĐỂ THẨM ĐỊNH HÌNH ẢNH (VLM ENGINE)
   async callGeminiVisionApi(apiKey, base64Data, mimeType, userText, systemPrompt) {
     const models = AdvConfig.GEMINI_MODELS;
     let lastErr = null;

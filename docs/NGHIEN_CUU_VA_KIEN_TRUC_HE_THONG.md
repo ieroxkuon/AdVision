@@ -16,7 +16,7 @@ Dự án hướng tới việc giải quyết bài toán: **Làm thế nào đ�
 
 ## 2. MÔ HÌNH KIẾN TRÚC PHẦN MỀM PHÂN TẦNG (LAYERED ARCHITECTURE)
 
-Hệ thống được thiết kế theo nguyên lý phân tách trách nhiệm (Separation of Concerns - SoC):
+Hệ thống được thiết kế theo nguyên lý phân tách trách nhiệm (Separation of Concerns - SoC), làm rõ hai nhiệm vụ cốt lõi:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -30,17 +30,21 @@ Hệ thống được thiết kế theo nguyên lý phân tách trách nhiệm (
 │                    TẦNG ĐIỀU PHỐI (CONTROLLER LAYER)                   │
 │   • app.js (Orchestrator kết nối State, UI, API và Persona)           │
 │   • Quản lý phiên làm việc, lịch sử hội thoại, tên riêng, ngành hàng   │
-└───────────────────┬────────────────────────────────┬───────────────────┘
-                    │                                │
-┌───────────────────▼──────────────┐   ┌─────────────▼───────────────────┐
-│     TẦNG NGHIỆP VỤ & TRI THỨC    │   │      TẦNG DỊCH VỤ & AI GATEWAY   │
-│   • rulesService.js (22 Rules)   │   │   • apiService.js               │
-│   • personaPrompt.js (Hoàng An)  │   │     - Google Gemini 2.5 Flash   │
-│   • redesignGenerator.js         │   │     - OpenAI GPT-4o-mini Vision │
-│     (Sinh Prompt cho GenAI)      │   │   • config.js (Cấu hình hệ thống│
-└───────────────────┬──────────────┘   └─────────────┬───────────────────┘
-                    │                                │
-┌───────────────────▼────────────────────────────────▼───────────────────┐
+└──────────────┬──────────────────────────────────────────┬──────────────┘
+               │                                          │
+┌──────────────▼──────────────────────────┐  ┌────────────▼──────────────┐
+│  TẦNG 1: PHÂN TÍCH NỘI DUNG & ĐẶC TRƯNG │  │ TẦNG 2: TÁC TỬ & NGHIỆP VỤ│
+│  (CONTENT ANALYSIS & FEATURE EXTRACTOR) │  │  (TASK & AGENT WORKFLOW)  │
+│                                         │  │                           │
+│  • imageFeatureExtractor.js             │  │  • rulesService.js        │
+│    (Kích thước, Tỷ lệ khung hình, Canvas│  │    (22 Quy chuẩn thiết kế)│
+│     tiền xử lý độ phân giải)            │  │  • personaPrompt.js       │
+│  • apiService.js (Vision Transformer ViT│  │    (Quy trình thẩm định)  │
+│    Bộ mã hóa thị giác Gemini 2.5 Flash) │  │  • redesignGenerator.js   │
+│  • Bóc tách: Sản phẩm, Typography, CTA  │  │    (Sinh Prompt Gen AI)   │
+└─────────────────────────────────────────┘  └───────────────────────────┘
+                                    │
+┌───────────────────────────────────▼────────────────────────────────────┐
 │                      TẦNG DỮ LIỆU (DATA & PIPELINE LAYER)              │
 │   • data/design_rules.json (Single Source of Truth)                    │
 │   • scripts/compile_master_knowledge.py (Biên dịch tri thức)          │

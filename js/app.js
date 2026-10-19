@@ -15,26 +15,46 @@ const AppController = {
   state: {
     userName: localStorage.getItem(AdvConfig.STORAGE_KEYS.USER_NAME) || "",
     userIndustry: localStorage.getItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY) || "",
+    userPlatform: localStorage.getItem('adv_user_platform') || "", // Facebook, TikTok, Shopee...
     nameVariations: JSON.parse(localStorage.getItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS) || "[]"),
     attachedImages: [],
     activeImageData: null,
-    conversationHistory: []
+    conversationHistory: [],
+    conversationStage: 'idle', // idle | image_overview | deep_dive | done
+    lastFailedRequest: null    // Lưu lại request để retry khi lỗi API
   },
 
   // Khởi động toàn bộ hệ thống
   init() {
+    // Tự động làm sạch các chuỗi cũ bị lỗi nếu có
+    if (this.state.userPlatform && (this.state.userPlatform.length > 30 || /không|gì|sao|thế nào/i.test(this.state.userPlatform))) {
+      this.state.userPlatform = "";
+      localStorage.removeItem('adv_user_platform');
+    }
+    if (this.state.userIndustry && (this.state.userIndustry.length > 40 || /nha bạn|nhé|không/i.test(this.state.userIndustry))) {
+      if (this.state.userIndustry.toLowerCase().includes('thực phẩm')) {
+        this.state.userIndustry = "F&B / Thực phẩm";
+      } else {
+        this.state.userIndustry = "";
+      }
+      localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry);
+    }
+
     UIController.initModals();
     this.bindEvents();
     this.updateSystemStatus();
 
-    // Hiển thị lời chào mở đầu nếu là người dùng mới
     if (!this.state.userName) {
       this.playInitialGreeting();
     } else {
       const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
       UIController.streamLines([
-        `Chào ${callName}, mình rất vui được gặp lại bạn.`,
-        `Bạn có thể gửi hình ảnh quảng cáo mới vào đây để chúng mình cùng phân tích tiếp nhé.`
+        `Chào ${callName}, rất vui được gặp lại bạn!`,
+        `Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`
+      ], [
+        { text: '📎 Gửi ảnh ngay', action: '__attach__' },
+        { text: 'F&B Thực phẩm', action: 'Mình đang làm sản phẩm ngành thực phẩm' },
+        { text: 'Thời trang & Làm đẹp', action: 'Mình làm ngành thời trang mỹ phẩm' }
       ]);
     }
   },
@@ -51,19 +71,21 @@ const AppController = {
     UIController.updateInputPlaceholder(this.state.userName, this.state.userIndustry, callName, this.state.attachedImages.length);
   },
 
-  // Lời chào mở đầu thân thiện từ Hoàng An
+  // Lời chào mở đầu
   async playInitialGreeting() {
     UIController.elements.chatContainer.innerHTML = '';
-    UIController.showTypingIndicator("Hoàng An đang chuẩn bị...");
-    await UIController.delay(700);
+    UIController.showTypingIndicator();
+    await UIController.delay(500);
     UIController.hideTypingIndicator();
-
-    const greetingLines = [
-      "Chào bạn, mình là Hoàng An.",
-      "Mình rất vui được đồng hành cùng bạn trong việc thẩm định và tối ưu hóa các hình ảnh quảng cáo.",
-      "Trước khi bắt đầu, bạn có thể chia sẻ cho mình biết tên của bạn để chúng mình tiện xưng hô được không?"
-    ];
-    await UIController.streamLines(greetingLines);
+    await UIController.streamLines([
+      "Chào bạn, mình là Nguyễn Hoàng An - Cố vấn Thẩm định Thị giác Quảng cáo.",
+      "Bạn đang chuẩn bị triển khai chiến dịch cho sản phẩm hoặc ngành hàng nào vậy?",
+      "Bạn có thể nhắn tin trao đổi hoặc bấm vào biểu tượng kẹp giấy 📎 ở dưới để gửi ảnh cho mình xem ngay nhé!"
+    ], [
+      { text: '📎 Gửi ảnh ngay', action: '__attach__' },
+      { text: 'F&B Thực phẩm', action: 'Mình đang làm sản phẩm ngành thực phẩm' },
+      { text: 'Thời trang & Làm đẹp', action: 'Mình làm ngành thời trang mỹ phẩm' }
+    ]);
   },
 
   // Đăng ký các sự kiện tương tác
@@ -98,15 +120,19 @@ const AppController = {
     // Sự kiện đặt lại cuộc trò chuyện từ đầu
     if (btnResetChat) {
       btnResetChat.addEventListener('click', () => {
-        if (confirm('Bạn có muốn bắt đầu lại cuộc trò chuyện và nhập lại thông tin từ đầu không?')) {
+        if (confirm('Bạn có muốn bắt đầu lại cuộc trò chuyện không?')) {
           this.state.userName = "";
           this.state.userIndustry = "";
+          this.state.userPlatform = "";
           this.state.nameVariations = [];
           this.state.activeImageData = null;
           this.state.conversationHistory = [];
+          this.state.conversationStage = 'idle';
+          this.state.lastFailedRequest = null;
           localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_NAME);
           localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY);
           localStorage.removeItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS);
+          localStorage.removeItem('adv_user_platform');
           this.clearAllAttachments();
           this.updateSystemStatus();
           this.playInitialGreeting();
@@ -134,14 +160,28 @@ const AppController = {
     let loaded = 0;
     for (const file of validFiles) {
       const reader = new FileReader();
-      reader.onload = (e) => {
-        this.state.attachedImages.push({
+      reader.onload = async (e) => {
+        const rawImgObj = {
           fileName: file.name,
           mimeType: file.type,
           size: file.size,
           base64: e.target.result.split(',')[1],
           dataUrl: e.target.result
-        });
+        };
+
+        // Trích xuất đặc trưng vật lý & tỷ lệ khung hình
+        let features = null;
+        if (window.ImageFeatureExtractor) {
+          try {
+            features = await window.ImageFeatureExtractor.extractFeatures(rawImgObj);
+          } catch (err) {
+            console.warn("Không trích xuất được metadata ảnh:", err);
+          }
+        }
+
+        rawImgObj.features = features;
+        this.state.attachedImages.push(rawImgObj);
+
         loaded++;
         if (loaded === validFiles.length) {
           UIController.renderAttachmentPreviews(this.state.attachedImages);
@@ -169,12 +209,162 @@ const AppController = {
     UIController.updateInputPlaceholder(this.state.userName, this.state.userIndustry, callName, 0);
   },
 
-  // Kích hoạt phản hồi nhanh từ các nút gợi ý
-  triggerQuickAction(actionText) {
-    if (UIController.elements.chatInput) {
-      UIController.elements.chatInput.value = actionText;
-      this.handleChatSubmit();
+  // Kích hoạt phản hồi nhanh từ các nút gợi ý (hỗ trợ cả topic key lẫn free text)
+  triggerQuickAction(actionKey) {
+    if (actionKey === '__retry__') return;
+    if (actionKey === '__attach__') {
+      const fileInput = UIController.elements.fileInput;
+      if (fileInput) fileInput.click();
+      return;
     }
+    const chatInput = UIController.elements.chatInput;
+    if (!chatInput) return;
+
+    // Khi là topic key thì xử lý theo flow hội thoại chuyên sâu
+    const topicKeys = [
+      'first_impression', 'strengths', 'weaknesses', 'fix_order',
+      'layout', 'typography', 'pros_cons', 'suggestions',
+      'platform_fb', 'platform_tiktok', 'redesign_prompt', 'compare'
+    ];
+    if (topicKeys.includes(actionKey)) {
+      this.handleFollowUpTopic(actionKey);
+      return;
+    }
+
+    // Free text: điền vào input và gửi bình thường
+    chatInput.value = actionKey;
+    this.handleChatSubmit();
+  },
+
+  // Hiển thị lỗi API với nút Thử lại trực quan
+  showApiError(errorMsg, retryFn) {
+    const isHighDemand = /high demand|spikes in demand|503|overloaded|quota|resource exhausted/i.test(errorMsg);
+    const lines = isHighDemand ? [
+      "Hệ thống máy chủ AI của Google đang có lượng truy cập tăng đột biến (Spikes in demand).",
+      "Hiện tượng này thường chỉ kéo dài khoảng vài giây. Bạn chờ một chút rồi bấm nút bên dưới để mình tiếp tục thẩm định nhé!"
+    ] : [
+      `Mình gặp chút gián đoạn kết nối khi xử lý yêu cầu (${errorMsg}).`,
+      `Bạn vui lòng kiểm tra lại kết nối mạng hoặc mã API Key, rồi bấm Thử lại giúp mình nhé.`
+    ];
+    const actions = [{ text: '🔄 Thử lại ngay', action: '__retry__' }];
+    UIController.streamLines(lines, actions).then(() => {
+      // Gắn hàm retry vào button
+      const retryButtons = document.querySelectorAll('[onclick*="__retry__"]');
+      retryButtons.forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          retryFn && retryFn();
+        };
+      });
+    });
+  },
+
+  // Xử lý khi người dùng chọn một topic cụ thể từ quick actions
+  async handleFollowUpTopic(topic) {
+    if (UIController.isAiTyping) return;
+    const apiKey = AdvConfig.getEffectiveApiKey();
+    if (!apiKey) return;
+
+    const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
+    const systemPrompt = PersonaPrompt.getSystemPrompt(callName);
+    const followUpText = PersonaPrompt.buildFollowUpPrompt(callName, topic);
+    if (!followUpText) return;
+
+    // Hiển thị tin nhắn người dùng ngắn gọn
+    const topicLabels = {
+      first_impression: 'Người xem thấy gì trước tiên?',
+      strengths: 'Chỗ nào làm tốt?',
+      weaknesses: 'Chỗ nào chưa ổn?',
+      fix_order: 'Mình nên sửa gì trước?',
+      platform_fb: 'Tối ưu cho Facebook & Instagram',
+      platform_tiktok: 'Tối ưu cho TikTok',
+      redesign_prompt: 'Tạo Prompt tái thiết kế',
+      compare: 'So sánh ảnh nào tốt hơn'
+    };
+    UIController.appendUserMessage(topicLabels[topic] || topic, []);
+    UIController.showTypingIndicator();
+
+    let apiResponse = '';
+    try {
+      apiResponse = await ApiService.chatNextTurn({
+        apiKey, text: followUpText, systemPrompt,
+        conversationHistory: this.state.conversationHistory,
+        activeImageData: this.state.activeImageData
+      });
+    } catch (err) {
+      UIController.hideTypingIndicator();
+      this.showApiError(err.message, () => this.handleFollowUpTopic(topic));
+      return;
+    }
+
+    UIController.hideTypingIndicator();
+    this.state.conversationHistory.push({ role: 'user', text: followUpText });
+    this.state.conversationHistory.push({ role: 'model', text: apiResponse });
+    this.state.conversationStage = 'deep_dive';
+
+    const lines = apiResponse.split('\n')
+      .map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
+    await UIController.streamLines(lines, this.getNextActionsForTopic(topic));
+  },
+
+  // Sinh quick actions tiếp theo dựa trên topic vừa trả lời - theo đoạn hội thoại mẫu
+  getNextActionsForTopic(topic) {
+    // Flow: overview → first_impression → strengths → weaknesses → fix_order → platform → redesign
+    const map = {
+      first_impression: [
+        { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' },
+        { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
+      ],
+      strengths: [
+        { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' },
+        { text: '🎯 Mình nên sửa gì trước?', action: 'fix_order' }
+      ],
+      weaknesses: [
+        { text: '🎯 Mình nên sửa gì trước?', action: 'fix_order' },
+        { text: '💡 Đề xuất cách sửa cụ thể', action: 'suggestions' },
+        { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
+      ],
+      fix_order: [
+        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+        { text: 'Tối ưu cho Facebook', action: 'platform_fb' },
+        { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+      ],
+      platform_fb: [
+        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+        { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+      ],
+      platform_tiktok: [
+        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+        { text: 'Tối ưu cho Facebook', action: 'platform_fb' }
+      ],
+      redesign_prompt: [
+        { text: 'Tối ưu cho Facebook', action: 'platform_fb' },
+        { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+      ],
+      compare: [
+        { text: 'Người xem thấy gì trước?', action: 'first_impression' },
+        { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' },
+        { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
+      ],
+      // Aliases cho các topic cũ
+      layout: [
+        { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' },
+        { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
+      ],
+      typography: [
+        { text: 'Chỗ nào làm tốt?', action: 'strengths' },
+        { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
+      ],
+      pros_cons: [
+        { text: 'Mình nên sửa gì trước?', action: 'fix_order' },
+        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' }
+      ],
+      suggestions: [
+        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+        { text: 'Tối ưu cho Facebook', action: 'platform_fb' }
+      ]
+    };
+    return map[topic] || [];
   },
 
   // Xử lý gửi tin nhắn người dùng
@@ -191,50 +381,38 @@ const AppController = {
 
     UIController.appendUserMessage(text, sentImages);
 
-    // BƯỚC 1: TRÍCH XUẤT TÊN THÔNG MINH
-    if (!this.state.userName && sentImages.length === 0) {
-      const parsed = PersonaPrompt.extractSmartName(text);
-      this.state.userName = parsed.mainName;
-      this.state.nameVariations = parsed.variations;
-      localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_NAME, this.state.userName);
-      localStorage.setItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS, JSON.stringify(this.state.nameVariations));
+    // Tự động nhận diện ngữ cảnh (tên, ngành hàng, nền tảng) từ tin nhắn của người dùng
+    if (text) {
+      const detected = PersonaPrompt.detectContextFromText(text);
+      if (detected.userName && !this.state.userName) {
+        this.state.userName = detected.userName;
+        this.state.nameVariations = detected.nameVariations || [detected.userName];
+        localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_NAME, this.state.userName);
+        localStorage.setItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS, JSON.stringify(this.state.nameVariations));
+      } else if (!this.state.userName && sentImages.length === 0 && text.split(/\s+/).length <= 2 && !text.includes('?')) {
+        const parsed = PersonaPrompt.extractSmartName(text);
+        if (parsed.mainName && parsed.mainName !== "bạn") {
+          this.state.userName = parsed.mainName;
+          this.state.nameVariations = parsed.variations;
+          localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_NAME, this.state.userName);
+          localStorage.setItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS, JSON.stringify(this.state.nameVariations));
+        }
+      }
+
+      if (detected.userIndustry) {
+        this.state.userIndustry = detected.userIndustry;
+        localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry);
+      }
+      if (detected.userPlatform) {
+        this.state.userPlatform = detected.userPlatform;
+        localStorage.setItem('adv_user_platform', this.state.userPlatform);
+      }
       this.updateSystemStatus();
-
-      const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
-      const replyLines = [
-        `Chào ${callName}, mình rất vui được làm quen với bạn.`,
-        `Để mình có thể nắm bắt đúng bối cảnh thiết kế trước khi xem ảnh, bạn có thể chia sẻ cho mình biết sản phẩm bạn đang làm thuộc ngành hàng nào không?`
-      ];
-
-      UIController.showTypingIndicator("Hoàng An đang soạn câu trả lời...");
-      await UIController.delay(800);
-      UIController.hideTypingIndicator();
-      await UIController.streamLines(replyLines);
-      return;
-    }
-
-    // BƯỚC 2: NHẬN DIỆN NGÀNH HÀNG
-    if (this.state.userName && !this.state.userIndustry && sentImages.length === 0) {
-      this.state.userIndustry = text.trim();
-      localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry);
-      this.updateSystemStatus();
-
-      const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
-      const replyLines = [
-        `Mình đã nắm được thông tin ngành hàng ${this.state.userIndustry} của ${callName} rồi.`,
-        `Bây giờ, bạn có thể bấm vào biểu tượng chiếc kẹp giấy ở phía dưới để gửi 1 hoặc nhiều hình ảnh quảng cáo qua cho mình xem nhé.`
-      ];
-
-      UIController.showTypingIndicator("Hoàng An đang soạn câu trả lời...");
-      await UIController.delay(800);
-      UIController.hideTypingIndicator();
-      await UIController.streamLines(replyLines);
-      return;
     }
 
     const apiKey = AdvConfig.getEffectiveApiKey();
     if (!apiKey) {
-      UIController.showTypingIndicator("Hoàng An đang kiểm tra kết nối...");
+      UIController.showTypingIndicator("Đang kiểm tra kết nối...");
       await UIController.delay(700);
       UIController.hideTypingIndicator();
       await UIController.streamLines([
@@ -245,12 +423,12 @@ const AppController = {
     }
 
     const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
-    const systemPrompt = PersonaPrompt.getSystemPrompt(callName);
+    const systemPrompt = PersonaPrompt.getSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform);
 
     // BƯỚC 3: NGƯỜI DÙNG GỬI ẢNH -> THẨM ĐỊNH TỪNG ẢNH MỘT
     if (sentImages.length > 0) {
       if (sentImages.length > 1) {
-        UIController.showTypingIndicator(`Hoàng An đang tiếp nhận ${sentImages.length} bức ảnh...`);
+        UIController.showTypingIndicator(`Đang tiếp nhận ${sentImages.length} bức ảnh...`);
         await UIController.delay(600);
         UIController.hideTypingIndicator();
         await UIController.streamLines([
@@ -265,9 +443,13 @@ const AppController = {
         this.state.activeImageData = currentImg;
 
         const indicatorText = sentImages.length > 1
-          ? `Hoàng An đang thẩm định ảnh ${i + 1}/${sentImages.length}: ${currentImg.fileName}...`
-          : `Hoàng An đang soi ảnh dựa trên bộ tri thức thiết kế...`;
+          ? `Đang xem ảnh ${i + 1}/${sentImages.length}...`
+          : `Đang xem ảnh...`;
         UIController.showTypingIndicator(indicatorText);
+
+        const featureSummary = (window.ImageFeatureExtractor && currentImg.features)
+          ? window.ImageFeatureExtractor.formatFeatureSummary(currentImg.features)
+          : "";
 
         const userPromptText = PersonaPrompt.buildVisionUserPrompt(
           callName,
@@ -275,7 +457,8 @@ const AppController = {
           currentImg,
           i,
           sentImages.length,
-          text
+          text,
+          featureSummary
         );
 
         let apiResponse = "";
@@ -289,7 +472,32 @@ const AppController = {
           });
         } catch (err) {
           console.error("Lỗi Vision API:", err);
-          apiResponse = `Mình gặp sự cố khi thẩm định bức ảnh ${currentImg.fileName} (${err.message}). Bạn vui lòng kiểm tra lại mã API Key hoặc kết nối mạng nhé.`;
+          UIController.hideTypingIndicator();
+          const retryImg = currentImg;
+          const retryText = text;
+          this.showApiError(err.message, async () => {
+            // Retry: gửi lại chính ảnh đó
+            UIController.showTypingIndicator();
+            try {
+              const retryResp = await ApiService.analyzeImage({
+                apiKey, base64: retryImg.base64, mimeType: retryImg.mimeType,
+                prompt: userPromptText, systemPrompt
+              });
+              UIController.hideTypingIndicator();
+              const retryLines = retryResp.split('\n')
+                .map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
+              await UIController.streamLines(retryLines, [
+                { text: 'Người xem thấy gì trước?', action: 'first_impression' },
+                { text: 'Chỗ nào làm tốt?', action: 'strengths' },
+                { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
+              ]);
+              this.state.conversationStage = 'image_overview';
+            } catch (e2) {
+              UIController.hideTypingIndicator();
+              await UIController.streamLines([`Vẫn gặp lỗi (${e2.message}). Bạn thử kiểm tra API Key nhé.`]);
+            }
+          });
+          return;
         }
 
         UIController.hideTypingIndicator();
@@ -302,15 +510,17 @@ const AppController = {
           .filter(l => l.length > 0);
 
         const isLast = (i === sentImages.length - 1);
+        // Quick actions sau overview: đúng theo flow hội thoại mẫu
         const quickActions = isLast ? (
           sentImages.length > 1 ? [
-            { text: "So sánh ảnh nào tối ưu nhất?", action: "compare_images" },
-            { text: "Tối ưu cho Facebook & Instagram", action: "reply_facebook" },
-            { text: "Tối ưu cho TikTok Video dọc", action: "reply_tiktok" }
+            { text: 'So sánh ảnh nào tốt hơn', action: 'compare' },
+            { text: 'Người xem thấy gì trước?', action: 'first_impression' },
+            { text: 'Chỗ nào làm tốt?', action: 'strengths' },
+            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
           ] : [
-            { text: "Tối ưu cho Facebook & Instagram", action: "reply_facebook" },
-            { text: "Tối ưu cho TikTok & Video dọc", action: "reply_tiktok" },
-            { text: "Gợi ý bảng màu & Font chữ mới", action: "reply_palette" }
+            { text: 'Người xem thấy gì trước?', action: 'first_impression' },
+            { text: 'Chỗ nào làm tốt?', action: 'strengths' },
+            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
           ]
         ) : null;
 
@@ -319,6 +529,8 @@ const AppController = {
         }
 
         await UIController.streamLines(lines, quickActions);
+        // Cập nhật giai đoạn sau khi hiển thị overview
+        if (isLast) this.state.conversationStage = 'image_overview';
 
         if (!isLast) {
           await UIController.delay(700);
@@ -329,20 +541,36 @@ const AppController = {
 
     // BƯỚC 4: HỘI THOẠI ĐA LƯỢT (MULTI-TURN CHAT)
     if (text) {
-      UIController.showTypingIndicator("Hoàng An đang tra cứu quy chuẩn thiết kế...");
+      UIController.showTypingIndicator();
 
       let apiResponse = "";
       try {
         apiResponse = await ApiService.chatNextTurn({
-          apiKey,
-          text,
-          systemPrompt,
+          apiKey, text, systemPrompt,
           conversationHistory: this.state.conversationHistory,
           activeImageData: this.state.activeImageData
         });
       } catch (err) {
         console.error("Lỗi Chat API:", err);
-        apiResponse = `Đã xảy ra lỗi khi kết nối với AI (${err.message}). Bạn vui lòng thử lại sau giây lát nhé.`;
+        UIController.hideTypingIndicator();
+        const savedText = text;
+        this.showApiError(err.message, async () => {
+          UIController.showTypingIndicator();
+          try {
+            const r = await ApiService.chatNextTurn({
+              apiKey, text: savedText, systemPrompt,
+              conversationHistory: this.state.conversationHistory,
+              activeImageData: this.state.activeImageData
+            });
+            UIController.hideTypingIndicator();
+            const rLines = r.split('\n').map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
+            await UIController.streamLines(rLines);
+          } catch (e2) {
+            UIController.hideTypingIndicator();
+            await UIController.streamLines([`Vẫn lỗi (${e2.message}). Bạn thử lại sau nhé.`]);
+          }
+        });
+        return;
       }
 
       UIController.hideTypingIndicator();
@@ -355,21 +583,44 @@ const AppController = {
         .filter(l => l.length > 0);
 
       let nextActions = null;
-      const lower = text.toLowerCase();
-      if (lower.includes('bố cục') || lower.includes('chữ')) {
+      if (!this.state.activeImageData) {
+        // Khi người dùng chat trao đổi trước khi gửi ảnh
         nextActions = [
-          { text: "Xem ưu điểm & hạn chế", action: "step_block3" },
-          { text: "Xem đề xuất chỉnh sửa", action: "step_block4" }
+          { text: '📎 Gửi ảnh thẩm định', action: '__attach__' },
+          { text: 'Chạy Facebook & Instagram', action: 'Mình định chạy Facebook và Instagram' },
+          { text: 'Chạy TikTok Video dọc', action: 'Mình định chạy TikTok Video dọc' }
         ];
-      } else if (lower.includes('ưu điểm') || lower.includes('hạn chế')) {
-        nextActions = [
-          { text: "Xem đề xuất chỉnh sửa", action: "step_block4" }
-        ];
-      } else if (lower.includes('đề xuất') || lower.includes('chỉnh sửa')) {
-        nextActions = [
-          { text: "Tối ưu cho Facebook", action: "reply_facebook" },
-          { text: "Tối ưu cho TikTok", action: "reply_tiktok" }
-        ];
+      } else {
+        // Sinh quick actions theo nội dung câu hỏi tự nhập của người dùng khi đã có ảnh
+        const lower = text.toLowerCase();
+        if (lower.includes('nhìn') || lower.includes('mắt') || lower.includes('thấy gì') || lower.includes('trước')) {
+          nextActions = [
+            { text: 'Chỗ nào làm tốt?', action: 'strengths' },
+            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
+          ];
+        } else if (lower.includes('tốt') || lower.includes('ưu điểm') || lower.includes('mạnh')) {
+          nextActions = [
+            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' },
+            { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
+          ];
+        } else if (lower.includes('chưa ổn') || lower.includes('hạn chế') || lower.includes('điểm yếu') || lower.includes('sai')) {
+          nextActions = [
+            { text: 'Mình nên sửa gì trước?', action: 'fix_order' },
+            { text: 'Chỗ nào làm tốt?', action: 'strengths' }
+          ];
+        } else if (lower.includes('sửa') || lower.includes('đề xuất') || lower.includes('chỉnh')) {
+          nextActions = [
+            { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+            { text: 'Tối ưu cho Facebook', action: 'platform_fb' },
+            { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+          ];
+        } else if (this.state.conversationStage === 'image_overview') {
+          nextActions = [
+            { text: 'Người xem thấy gì trước?', action: 'first_impression' },
+            { text: 'Chỗ nào làm tốt?', action: 'strengths' },
+            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
+          ];
+        }
       }
 
       await UIController.streamLines(lines, nextActions);

@@ -43,6 +43,9 @@ const UIController = {
   // Trạng thái hiển thị AI đang phản hồi
   isAiTyping: false,
 
+  // HTML avatar dùng chung cho AI agent trong chat
+  AI_AVATAR_HTML: `<img src="images/advisor_hoang_an.jpg" alt="Hoàng An" class="w-8 h-8 rounded-full object-cover shrink-0 shadow-md ring-2 ring-violet-200/60 dark:ring-violet-900/60">`,
+
   // Tiện ích tạm dừng bất đồng bộ
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -103,9 +106,9 @@ const UIController = {
     }
 
     if (!userName) {
-      input.placeholder = "Nhập tên của bạn (ví dụ: Trần Thái Cương, Linh)...";
+      input.placeholder = "Nhập tên hoặc cách xưng hô bạn muốn để tiện trao đổi...";
     } else if (!userIndustry) {
-      input.placeholder = `Sản phẩm ${callName} đang làm thuộc ngành nào (thời trang, mỹ phẩm...)?`;
+      input.placeholder = `Sản phẩm ${callName} đang làm thuộc ngành nào (ví dụ: F&B đồ ăn, thời trang, mỹ phẩm...)?`;
     } else {
       input.placeholder = "Nhắn tin trao đổi hoặc bấm 📎 để gửi ảnh quảng cáo...";
     }
@@ -166,14 +169,12 @@ const UIController = {
     this.scrollToBottom();
   },
 
-  // Hiển thị chỉ báo Hoàng An đang suy nghĩ / soạn tin
-  showTypingIndicator(message = "Hoàng An đang soạn câu trả lời...") {
+  // Hiển thị chỉ báo đang suy nghĩ / soạn tin
+  showTypingIndicator(message = "Đang soạn câu trả lời...") {
     this.isAiTyping = true;
     const html = `
       <div id="typing-indicator" class="flex gap-3 items-center">
-        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-700 text-white flex items-center justify-center text-xs font-bold shrink-0 shadow-sm ring-1 ring-slate-100 dark:ring-slate-800">
-          HA
-        </div>
+        ${this.AI_AVATAR_HTML}
         <div class="inline-flex items-center gap-2.5 bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark px-4 py-2.5 rounded-2xl rounded-tl-sm text-xs text-slate-500 dark:text-slate-400 shadow-sm">
           <div class="flex items-center gap-1">
             <div class="typing-dot"></div>
@@ -200,11 +201,43 @@ const UIController = {
     if (/^\[GỢI Ý PROMPT.*?\]\s*$/i.test(line)) return 'redesign-prompt-header';
     if (/^\[.+\]\s*$/.test(line)) return 'block-header';
     if (/^📸\s/.test(line)) return 'image-label';
+    if (/^(Đánh giá( tổng quan)?:?\s*\d+(\.\d+)?\/10|\b\d+(\.\d+)?\/10\s*điểm)/i.test(line)) return 'score-badge';
+    if (/^(Điểm nghẽn|Hạt sạn|Lỗi|Điểm chưa ổn|Vấn đề)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Điểm nghẽn|Hạt sạn|Lỗi|Điểm chưa ổn)/i.test(line)) return 'flaw-card';
+    if (/^(Điểm sáng|Ưu điểm|Điểm mạnh|Điểm làm tốt)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Điểm sáng|Ưu điểm|Điểm mạnh)/i.test(line)) return 'strength-card';
+    if (/^(Đề xuất|Khuyến nghị|Bước\s+\d+|Giải pháp)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Đề xuất|Bước\s+\d+)/i.test(line)) return 'recommendation-card';
+    if (/^(Theo bạn|Bạn muốn|Bạn nghĩ sao|Bạn định|Bạn có muốn)/i.test(line) && line.includes('?')) return 'question-card';
+    if (/^(Đầu tiên|Thứ nhất|Thứ hai|Thứ ba|Tiếp đến|Kế tiếp|Cuối cùng)(,|\s+là|\s+về)/i.test(line)) return 'conversational-point';
     if (/^[^-\[].+:\s*$/.test(line)) return 'section-title';
     if (/^-\s+.+:\s*$/.test(line)) return 'section-title';
     if (/^-\s+.+:/.test(line)) return 'bullet-with-content';
     if (/^-\s+/.test(line)) return 'bullet';
     return 'paragraph';
+  },
+
+  // Chuyển đổi inline Markdown (**in đậm**, *nghiêng*, `code`) thành HTML an toàn và trực quan
+  formatInlineMarkdown(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\*\*(.+?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>')
+      .replace(/\*([^\*]+?)\*/g, '<em class="italic text-slate-700 dark:text-slate-300">$1</em>')
+      .replace(/`([^`]+?)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-xs font-mono text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700">$1</code>');
+  },
+
+  // Tiện ích hiển thị chữ từng từ mượt mà (tương đương tốc độ ChatGPT)
+  async streamTextToElement(targetEl, text, wordDelay = 16) {
+    const tokens = text.split(/(\s+)/);
+    for (const token of tokens) {
+      targetEl.textContent += token;
+      this.scrollToBottom();
+      if (token.trim().length > 0) {
+        await this.delay(wordDelay);
+      }
+    }
+    // Render inline markdown khi đã stream xong toàn bộ từ của dòng
+    targetEl.innerHTML = this.formatInlineMarkdown(text);
   },
 
   // Tiện ích sao chép văn bản vào Clipboard mượt mà
@@ -224,17 +257,15 @@ const UIController = {
     }
   },
 
-  // Hiệu ứng hiển thị chữ từng dòng mượt mà (Streaming Lines)
+  // Hiệu ứng hiển thị chữ từng từ mượt mà & định dạng thẻ trực quan
   async streamLines(linesArray, actionButtons = null) {
     this.isAiTyping = true;
     const messageWrapperId = 'agent-msg-' + Date.now();
     const html = `
       <div class="flex gap-3.5 items-start">
-        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-slate-900 via-slate-800 to-slate-700 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-1 shadow-sm ring-1 ring-slate-100 dark:ring-slate-800">
-          HA
-        </div>
+        <div class="mt-1 shrink-0">${this.AI_AVATAR_HTML}</div>
         <div class="space-y-3 text-[15px] leading-relaxed flex-1 prose-refined">
-          <div id="${messageWrapperId}" class="bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-2.5 text-slate-800 dark:text-slate-200">
+          <div id="${messageWrapperId}" class="bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-3 text-slate-800 dark:text-slate-200">
           </div>
         </div>
       </div>
@@ -252,6 +283,7 @@ const UIController = {
       const el = document.createElement('div');
       el.className = 'fade-in-text';
 
+      // 1. Khối Prompt Tái thiết kế
       if (type === 'redesign-prompt-header') {
         isInsidePromptBlock = true;
         el.className = 'mt-3 p-3.5 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950 text-white border border-slate-700 shadow-md space-y-2.5';
@@ -268,16 +300,14 @@ const UIController = {
         `;
         container.appendChild(el);
         this.scrollToBottom();
-        await this.delay(90);
+        await this.delay(60);
         continue;
       }
 
       if (isInsidePromptBlock) {
-        // Kiểm tra nếu chuyển sang block mới khác
         if (type === 'block-header') {
           isInsidePromptBlock = false;
         } else {
-          // Render nội dung prompt kèm nút copy
           const promptBox = document.createElement('div');
           promptBox.className = 'p-3 bg-black/40 rounded-xl border border-slate-700/60 font-mono text-xs text-emerald-300 leading-relaxed space-y-2 select-all break-words';
           
@@ -300,52 +330,155 @@ const UIController = {
           }
 
           this.scrollToBottom();
-          await this.delay(90);
+          await this.delay(60);
           continue;
         }
       }
 
+      // 2. Thẻ Đánh giá & Điểm số tổng quan (Score Badge)
+      if (type === 'score-badge') {
+        el.className = 'my-1.5 inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700/80 text-amber-900 dark:text-amber-200 text-sm font-semibold shadow-xs';
+        el.innerHTML = `<i class="fa-solid fa-award text-amber-500"></i><span>${line}</span>`;
+        container.appendChild(el);
+        this.scrollToBottom();
+        await this.delay(100);
+        continue;
+      }
+
+      // 3. Thẻ Hạt sạn / Điểm chưa ổn (Flaw Card)
+      if (type === 'flaw-card') {
+        el.className = 'mt-2 p-3.5 rounded-xl bg-rose-50/70 dark:bg-rose-950/25 border-l-4 border-rose-500 border-t border-r border-b border-rose-200/60 dark:border-rose-900/40 text-slate-800 dark:text-slate-200 space-y-1 shadow-xs';
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const title = line.substring(0, colonIdx).replace(/^-\s*/, '');
+          const desc = line.substring(colonIdx + 1).trim();
+          el.innerHTML = `
+            <div class="flex items-center gap-1.5 font-bold text-rose-700 dark:text-rose-400 text-sm">
+              <i class="fa-solid fa-triangle-exclamation text-xs"></i>
+              <span>${title}</span>
+            </div>
+            <div class="text-[14px] leading-relaxed text-slate-700 dark:text-slate-300"></div>
+          `;
+          container.appendChild(el);
+          const descTarget = el.lastElementChild;
+          await this.streamTextToElement(descTarget, desc, 16);
+          continue;
+        }
+      }
+
+      // 4. Thẻ Điểm sáng / Ưu điểm (Strength Card)
+      if (type === 'strength-card') {
+        el.className = 'mt-2 p-3.5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/25 border-l-4 border-emerald-500 border-t border-r border-b border-emerald-200/60 dark:border-emerald-900/40 text-slate-800 dark:text-slate-200 space-y-1 shadow-xs';
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const title = line.substring(0, colonIdx).replace(/^-\s*/, '');
+          const desc = line.substring(colonIdx + 1).trim();
+          el.innerHTML = `
+            <div class="flex items-center gap-1.5 font-bold text-emerald-700 dark:text-emerald-400 text-sm">
+              <i class="fa-solid fa-circle-check text-xs"></i>
+              <span>${title}</span>
+            </div>
+            <div class="text-[14px] leading-relaxed text-slate-700 dark:text-slate-300"></div>
+          `;
+          container.appendChild(el);
+          const descTarget = el.lastElementChild;
+          await this.streamTextToElement(descTarget, desc, 16);
+          continue;
+        }
+      }
+
+      // 5. Thẻ Đề xuất / Thứ tự sửa (Recommendation Card)
+      if (type === 'recommendation-card') {
+        el.className = 'mt-2 p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/25 border-l-4 border-indigo-500 border-t border-r border-b border-indigo-200/60 dark:border-indigo-900/40 text-slate-800 dark:text-slate-200 space-y-1 shadow-xs';
+        const colonIdx = line.indexOf(':');
+        if (colonIdx > 0) {
+          const title = line.substring(0, colonIdx).replace(/^-\s*/, '');
+          const desc = line.substring(colonIdx + 1).trim();
+          el.innerHTML = `
+            <div class="flex items-center gap-1.5 font-bold text-indigo-700 dark:text-indigo-400 text-sm">
+              <i class="fa-solid fa-lightbulb text-xs"></i>
+              <span>${title}</span>
+            </div>
+            <div class="text-[14px] leading-relaxed text-slate-700 dark:text-slate-300"></div>
+          `;
+          container.appendChild(el);
+          const descTarget = el.lastElementChild;
+          await this.streamTextToElement(descTarget, desc, 16);
+          continue;
+        }
+      }
+
+      // 6. Hộp Câu hỏi tương tác ở cuối (Question Card)
+      if (type === 'question-card') {
+        el.className = 'mt-3 p-3.5 rounded-xl bg-violet-50/70 dark:bg-violet-950/25 border border-violet-200 dark:border-violet-900/50 text-slate-800 dark:text-slate-200 text-[14px] font-medium leading-relaxed flex items-start gap-2.5 shadow-xs';
+        el.innerHTML = `<span class="mt-0.5 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-300 flex items-center justify-center text-[10px] shrink-0 font-bold"><i class="fa-solid fa-comments"></i></span><div></div>`;
+        container.appendChild(el);
+        const textTarget = el.lastElementChild;
+        await this.streamTextToElement(textTarget, line, 18);
+        continue;
+      }
+
+      // 7. Header khối
       if (type === 'block-header') {
         el.className += ' text-[13px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 pt-3 pb-1 border-b border-slate-200/60 dark:border-slate-700/40 mb-1';
         el.textContent = line.replace(/^\[|\]$/g, '');
-      } else if (type === 'image-label') {
-        el.className += ' text-sm font-bold text-indigo-600 dark:text-indigo-400 pt-2 pb-1';
-        el.textContent = line;
-      } else if (type === 'section-title') {
-        el.className += ' font-semibold text-slate-900 dark:text-white text-[15px] pt-1';
-        el.textContent = line.replace(/^-\s+/, '');
-      } else if (type === 'bullet-with-content') {
-        const colonIdx = line.indexOf(':');
-        const label = line.substring(0, colonIdx + 1).replace(/^-\s+/, '');
-        const content = line.substring(colonIdx + 1).trim();
-        el.className += ' text-[15px] leading-relaxed pt-1';
-        const labelEl = document.createElement('div');
-        labelEl.className = 'font-semibold text-slate-900 dark:text-white';
-        labelEl.textContent = label;
-        const contentEl = document.createElement('div');
-        contentEl.className = 'font-normal text-slate-700 dark:text-slate-300';
-        contentEl.textContent = content;
-        el.append(labelEl, contentEl);
-      } else if (type === 'bullet') {
-        el.className += ' font-normal text-slate-700 dark:text-slate-300 leading-relaxed pl-4 text-[14px]';
-        el.textContent = line.replace(/^-\s+/, '• ');
-      } else {
-        el.className += ' font-normal text-slate-800 dark:text-slate-200 leading-relaxed';
-        el.textContent = line;
+        container.appendChild(el);
+        this.scrollToBottom();
+        await this.delay(60);
+        continue;
       }
 
+      // 8. Nhãn ảnh
+      if (type === 'image-label') {
+        el.className += ' text-sm font-bold text-indigo-600 dark:text-indigo-400 pt-2 pb-1';
+        el.textContent = line;
+        container.appendChild(el);
+        this.scrollToBottom();
+        await this.delay(60);
+        continue;
+      }
+
+      // 9. Tiêu đề mục
+      if (type === 'section-title') {
+        el.className += ' font-semibold text-slate-900 dark:text-white text-[15px] pt-1.5';
+        container.appendChild(el);
+        await this.streamTextToElement(el, line.replace(/^-\s+/, ''), 16);
+        continue;
+      }
+
+      // 10. Điểm nối hội thoại tự nhiên (Đầu tiên, Tiếp đến, Cuối cùng...)
+      if (type === 'conversational-point') {
+        el.className += ' font-semibold text-slate-900 dark:text-white leading-relaxed text-[15px] mt-2.5 pt-1.5 border-t border-slate-100 dark:border-borderDark/40 flex items-start gap-2';
+        el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></span><span class="flex-1"></span>`;
+        container.appendChild(el);
+        const target = el.lastElementChild;
+        await this.streamTextToElement(target, line, 16);
+        continue;
+      }
+
+      // 11. Dòng gạch đầu dòng (bullet hoặc bullet có nội dung)
+      if (type === 'bullet' || type === 'bullet-with-content') {
+        el.className += ' font-normal text-slate-700 dark:text-slate-300 leading-relaxed pl-3 text-[14px] flex items-start gap-2';
+        el.innerHTML = `<span class="text-indigo-500 font-bold shrink-0 mt-0.5">•</span><span class="flex-1"></span>`;
+        container.appendChild(el);
+        const target = el.lastElementChild;
+        await this.streamTextToElement(target, line.replace(/^-\s+/, ''), 16);
+        continue;
+      }
+
+      // 11. Đoạn văn bản thông thường (Stream từng từ chuẩn tốc độ ChatGPT)
+      el.className += ' font-normal text-slate-800 dark:text-slate-200 leading-relaxed text-[15px]';
       container.appendChild(el);
-      this.scrollToBottom();
-      await this.delay(90);
+      await this.streamTextToElement(el, line, 16);
     }
 
     if (actionButtons && actionButtons.length > 0) {
       const actionsDiv = document.createElement('div');
       actionsDiv.className = 'flex flex-wrap gap-2 pt-2.5 border-t border-slate-100 dark:border-borderDark mt-3 fade-in-text';
       actionsDiv.innerHTML = actionButtons.map(btn => `
-        <button type="button" onclick="window.AppController.triggerQuickAction('${btn.text}')" class="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all shadow-sm flex items-center gap-1.5">
+        <button type="button" onclick="window.AppController.triggerQuickAction('${btn.action || btn.text}')" class="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition-all shadow-sm flex items-center gap-1.5">
           <span>${btn.text}</span>
-          <i class="fa-solid fa-arrow-right text-[9px] opacity-50"></i>
+          <i class="fa-solid fa-chevron-right text-[9px] opacity-40"></i>
         </button>
       `).join('');
       container.appendChild(actionsDiv);

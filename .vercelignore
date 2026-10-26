@@ -1,0 +1,9 @@
+scripts/
+credentials/
+docs/
+trainingdocs/
+server.js
+requirements.txt
+__pycache__/
+*.py
+*.pyc

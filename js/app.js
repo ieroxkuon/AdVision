@@ -631,6 +631,10 @@ const AppController = {
 window.AppController = AppController;
 
 // Khởi tạo ứng dụng khi DOM sẵn sàng
-window.addEventListener('DOMContentLoaded', () => {
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', () => {
+    AppController.init();
+  });
+} else {
   AppController.init();
-});
+}

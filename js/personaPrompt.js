@@ -255,6 +255,15 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
     }
 
     return result;
+  },
+
+  // Lấy tên ngẫu nhiên trong danh sách biến thể để xưng hô tự nhiên
+  getDynamicCallName(variations, fallbackName = "bạn") {
+    if (!variations || variations.length === 0) {
+      return fallbackName || "bạn";
+    }
+    const randomIndex = Math.floor(Math.random() * variations.length);
+    return variations[randomIndex];
   }
 };
 

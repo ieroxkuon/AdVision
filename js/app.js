@@ -13,10 +13,17 @@
 const AppController = {
   // Trạng thái phiên làm việc (Session State)
   state: {
-    userName: localStorage.getItem(AdvConfig.STORAGE_KEYS.USER_NAME) || "",
-    userIndustry: localStorage.getItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY) || "",
-    userPlatform: localStorage.getItem('adv_user_platform') || "", // Facebook, TikTok, Shopee...
-    nameVariations: JSON.parse(localStorage.getItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS) || "[]"),
+    userName: (() => { try { return localStorage.getItem(AdvConfig.STORAGE_KEYS.USER_NAME) || ""; } catch(e) { return ""; } })(),
+    userIndustry: (() => { try { return localStorage.getItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY) || ""; } catch(e) { return ""; } })(),
+    userPlatform: (() => { try { return localStorage.getItem('adv_user_platform') || ""; } catch(e) { return ""; } })(),
+    nameVariations: (() => {
+      try {
+        const item = localStorage.getItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS);
+        return item ? JSON.parse(item) : [];
+      } catch (e) {
+        return [];
+      }
+    })(),
     attachedImages: [],
     activeImageData: null,
     conversationHistory: [],
@@ -26,36 +33,43 @@ const AppController = {
 
   // Khởi động toàn bộ hệ thống
   init() {
-    // Tự động làm sạch các chuỗi cũ bị lỗi nếu có
-    if (this.state.userPlatform && (this.state.userPlatform.length > 30 || /không|gì|sao|thế nào/i.test(this.state.userPlatform))) {
-      this.state.userPlatform = "";
-      localStorage.removeItem('adv_user_platform');
-    }
-    if (this.state.userIndustry && (this.state.userIndustry.length > 40 || /nha bạn|nhé|không/i.test(this.state.userIndustry))) {
-      if (this.state.userIndustry.toLowerCase().includes('thực phẩm')) {
-        this.state.userIndustry = "F&B / Thực phẩm";
-      } else {
-        this.state.userIndustry = "";
+    try {
+      // Tự động làm sạch các chuỗi cũ bị lỗi nếu có
+      if (this.state.userPlatform && (this.state.userPlatform.length > 30 || /không|gì|sao|thế nào/i.test(this.state.userPlatform))) {
+        this.state.userPlatform = "";
+        try { localStorage.removeItem('adv_user_platform'); } catch(e) {}
       }
-      localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry);
-    }
+      if (this.state.userIndustry && (this.state.userIndustry.length > 40 || /nha bạn|nhé|không/i.test(this.state.userIndustry))) {
+        if (this.state.userIndustry.toLowerCase().includes('thực phẩm')) {
+          this.state.userIndustry = "F&B / Thực phẩm";
+        } else {
+          this.state.userIndustry = "";
+        }
+        try { localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry); } catch(e) {}
+      }
 
-    UIController.initModals();
-    this.bindEvents();
-    this.updateSystemStatus();
+      UIController.initModals();
+      this.bindEvents();
+      this.updateSystemStatus();
 
-    if (!this.state.userName) {
+      if (!this.state.userName) {
+        this.playInitialGreeting();
+      } else {
+        const callName = (window.PersonaPrompt && PersonaPrompt.getDynamicCallName) 
+          ? PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName)
+          : (this.state.userName || "bạn");
+        UIController.streamLines([
+          `Chào ${callName}, rất vui được gặp lại bạn!`,
+          `Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`
+        ], [
+          { text: '📎 Gửi ảnh ngay', action: '__attach__' },
+          { text: 'F&B Thực phẩm', action: 'Mình đang làm sản phẩm ngành thực phẩm' },
+          { text: 'Thời trang & Làm đẹp', action: 'Mình làm ngành thời trang mỹ phẩm' }
+        ]);
+      }
+    } catch (err) {
+      console.error("AdVision Init Error:", err);
       this.playInitialGreeting();
-    } else {
-      const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
-      UIController.streamLines([
-        `Chào ${callName}, rất vui được gặp lại bạn!`,
-        `Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`
-      ], [
-        { text: '📎 Gửi ảnh ngay', action: '__attach__' },
-        { text: 'F&B Thực phẩm', action: 'Mình đang làm sản phẩm ngành thực phẩm' },
-        { text: 'Thời trang & Làm đẹp', action: 'Mình làm ngành thời trang mỹ phẩm' }
-      ]);
     }
   },
 

@@ -61,10 +61,6 @@ const AppController = {
         UIController.streamLines([
           `Chào ${callName}, rất vui được gặp lại bạn!`,
           `Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`
-        ], [
-          { text: '📎 Gửi ảnh ngay', action: '__attach__' },
-          { text: 'F&B Thực phẩm', action: 'Mình đang làm sản phẩm ngành thực phẩm' },
-          { text: 'Thời trang & Làm đẹp', action: 'Mình làm ngành thời trang mỹ phẩm' }
         ]);
       }
     } catch (err) {
@@ -95,10 +91,6 @@ const AppController = {
       "Chào bạn, mình là Nguyễn Hoàng An - Cố vấn Thẩm định Thị giác Quảng cáo.",
       "Bạn đang chuẩn bị triển khai chiến dịch cho sản phẩm hoặc ngành hàng nào vậy?",
       "Bạn có thể nhắn tin trao đổi hoặc bấm vào biểu tượng kẹp giấy 📎 ở dưới để gửi ảnh cho mình xem ngay nhé!"
-    ], [
-      { text: '📎 Gửi ảnh ngay', action: '__attach__' },
-      { text: 'F&B Thực phẩm', action: 'Mình đang làm sản phẩm ngành thực phẩm' },
-      { text: 'Thời trang & Làm đẹp', action: 'Mình làm ngành thời trang mỹ phẩm' }
     ]);
   },
 
@@ -598,12 +590,7 @@ const AppController = {
 
       let nextActions = null;
       if (!this.state.activeImageData) {
-        // Khi người dùng chat trao đổi trước khi gửi ảnh
-        nextActions = [
-          { text: '📎 Gửi ảnh thẩm định', action: '__attach__' },
-          { text: 'Chạy Facebook & Instagram', action: 'Mình định chạy Facebook và Instagram' },
-          { text: 'Chạy TikTok Video dọc', action: 'Mình định chạy TikTok Video dọc' }
-        ];
+        nextActions = null;
       } else {
         // Sinh quick actions theo nội dung câu hỏi tự nhập của người dùng khi đã có ảnh
         const lower = text.toLowerCase();

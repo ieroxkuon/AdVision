@@ -72,7 +72,7 @@ const UIController = {
   },
 
   // Cập nhật huy hiệu thông tin người dùng ở thanh công cụ
-  updateUserBadge(userName, userIndustry) {
+  updateUserBadge(userName, userIndustry, userPlatform = "") {
     const { userInfoBadge, badgeUserName, badgeIndustryContainer, badgeIndustryName } = this.elements;
     if (!userInfoBadge) return;
 
@@ -87,14 +87,31 @@ const UIController = {
       } else {
         badgeIndustryContainer.classList.add('hidden');
       }
+
+      // Hiển thị badge kênh quảng cáo nếu đã có
+      let platformBadge = document.getElementById('badge-platform-container');
+      if (userPlatform) {
+        if (!platformBadge) {
+          platformBadge = document.createElement('span');
+          platformBadge.id = 'badge-platform-container';
+          platformBadge.className = 'inline-flex items-center gap-1.5 bg-white dark:bg-cardDark px-2.5 py-1 rounded-full border border-indigo-200/80 dark:border-indigo-900/60 shadow-sm';
+          platformBadge.innerHTML = `<i class="fa-solid fa-mobile-screen text-indigo-400 text-[11px]"></i> <span class="font-medium text-indigo-700 dark:text-indigo-300 text-xs">${userPlatform}</span>`;
+          userInfoBadge.appendChild(platformBadge);
+        } else {
+          const span = platformBadge.querySelector('span');
+          if (span) span.textContent = userPlatform;
+        }
+      } else if (platformBadge) {
+        platformBadge.remove();
+      }
     } else {
       userInfoBadge.classList.add('hidden');
       userInfoBadge.classList.remove('flex');
     }
   },
 
-  // Cập nhật gợi ý placeholder trong ô nhập liệu
-  updateInputPlaceholder(userName, userIndustry, callName, attachedCount = 0) {
+  // Cập nhật gợi ý placeholder trong ô nhập liệu theo stage hội thoại
+  updateInputPlaceholder(userName, userIndustry, callName, attachedCount = 0, stage = 'idle') {
     const input = this.elements.chatInput;
     if (!input) return;
 
@@ -105,6 +122,29 @@ const UIController = {
       return;
     }
 
+    // Placeholder thông minh theo từng stage hội thoại
+    switch (stage) {
+      case 'briefing':
+        input.placeholder = "Bạn chạy kênh nào? Mục tiêu chiến dịch là gì? (ví dụ: Facebook Feed, bán hàng)";
+        return;
+      case 'awaiting_image':
+        input.placeholder = "Bấm 📎 để gửi ảnh quảng cáo — mình sẽ thẩm định ngay!";
+        return;
+      case 'image_overview':
+        input.placeholder = `Hỏi thêm ${callName ? 'về ảnh' : 'Hoàng An'} hoặc chọn gợi ý bên trên...`;
+        return;
+      case 'deep_dive':
+      case 'actionable':
+        input.placeholder = "Hỏi thêm hoặc chọn hành động gợi ý phía trên...";
+        return;
+      case 'done':
+        input.placeholder = "Gửi ảnh mới 📎 hoặc hỏi thêm về bức ảnh này...";
+        return;
+      default:
+        break;
+    }
+
+    // Fallback: flow cũ khi stage chưa rõ
     if (!userName) {
       input.placeholder = "Nhập tên hoặc cách xưng hô bạn muốn để tiện trao đổi...";
     } else if (!userIndustry) {

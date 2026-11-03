@@ -1,6 +1,6 @@
 # TÀI LIỆU 2: PHÂN TÍCH YÊU CẦU CHỨC NĂNG VÀ THIẾT KẾ KIẾN TRÚC HỆ THỐNG
 
-**Đề tài:** Hệ thống cố vấn thẩm định & đánh giá tiêu chuẩn hình ảnh quảng cáo ứng dụng AI Agent Multimodal  
+**Đề tài:** NGHIÊN CỨU VÀ XÂY DỰNG AI AGENT HỖ TRỢ PHÂN TÍCH, ĐÁNH GIÁ VÀ TỐI ƯU HÌNH ẢNH QUẢNG CÁO SỬ DỤNG MÔ HÌNH THỊ GIÁC NGÔN NGỮMultimodal  
 **Sinh viên:** Trần Thái Cương — MSSV: 2255010026  
 **Thời gian:** Tuần 2
 

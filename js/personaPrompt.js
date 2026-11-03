@@ -112,19 +112,54 @@ HƯỚNG DẪN ĐẶC BIỆT KHI TRÒ CHUYỆN (CHƯA GỬI ẢNH HOẶC ĐANG H
    * PROMPT GIAI ĐOẠN 1: Nhìn ảnh lần đầu - chỉ nhận xét tổng quan ngắn gọn.
    * AI KHÔNG được liệt kê toàn bộ phân tích. Chỉ 3-4 câu ấn tượng đầu tiên
    * và kết thúc bằng 1 câu hỏi mở để bắt đầu cuộc trò chuyện.
+   * Khi có context kênh + mục tiêu → inject quy chuẩn kỹ thuật phù hợp.
    */
-  buildVisionUserPrompt(callName, industry, currentImg, index, totalImages, userNote, featureSummary = "") {
+  buildVisionUserPrompt(callName, industry, currentImg, index, totalImages, userNote, featureSummary = "", platform = "", campaignGoal = "") {
     const techSpecs = featureSummary ? `\n\n[Thông số kỹ thuật ảnh]: ${featureSummary}` : "";
     const imgLabel = totalImages > 1 ? `bức ảnh thứ ${index + 1}/${totalImages} (${currentImg.fileName})` : `bức ảnh (${currentImg.fileName})`;
     const industryCtx = industry ? `ngành ${industry}` : "thương mại";
     const userContext = userNote ? `Người dùng nhắn: "${userNote}". ` : "";
 
-    return `Hoàng An ơi, đây là ${imgLabel} của ${callName} trong lĩnh vực ${industryCtx}.${techSpecs}
+    // Xây dựng context kỹ thuật từ kênh + mục tiêu đã briefing
+    let technicalContext = "";
+    if (platform || campaignGoal) {
+      const techLines = [];
+      if (platform) techLines.push(`Kênh phân phối: ${platform}`);
+      if (campaignGoal) {
+        const goalNames = { sales: 'Chốt đơn / Bán hàng', branding: 'Nhận diện thương hiệu', engagement: 'Tăng tương tác', lead_gen: 'Thu thập khách hàng' };
+        techLines.push(`Mục tiêu chiến dịch: ${goalNames[campaignGoal] || campaignGoal}`);
+      }
+      technicalContext = `\n\n[CONTEXT BRIEF]: ${techLines.join(' | ')}`;
+
+      // Thêm checklist kỹ thuật cụ thể
+      const checklistItems = [];
+      if (platform && (platform.includes('Feed') || platform.includes('1:1'))) {
+        checklistItems.push("Kiểm tra mật độ chữ < 20% diện tích (Text Rule Facebook)");
+        checklistItems.push("Đánh giá bố cục lưới 3x3 và điểm rơi thị giác");
+      }
+      if (platform && (platform.includes('Story') || platform.includes('9:16') || platform.includes('TikTok'))) {
+        checklistItems.push("Kiểm tra vùng an toàn (safe-zone) 150px trên/dưới tránh icon nền tảng");
+        checklistItems.push("Đánh giá sức hút trong 3 giây đầu tiên");
+      }
+      if (campaignGoal === 'sales') {
+        checklistItems.push("Ưu tiên kiểm tra độ tương phản và vị trí nút CTA (tương phản tối thiểu 4.5:1)");
+        checklistItems.push("Đánh giá tính nổi bật của ưu đãi/giá khuyến mãi");
+      }
+      if (campaignGoal === 'branding') {
+        checklistItems.push("Kiểm tra sự nhất quán màu sắc thương hiệu và tỷ lệ logo");
+        checklistItems.push("Đánh giá tính thẩm mỹ và hệ thống nhận diện thương hiệu");
+      }
+      if (checklistItems.length > 0) {
+        technicalContext += `\n[CHECKLIST KỸ THUẬT CẦN ĐỐI CHIẾU]:\n${checklistItems.map(c => `- ${c}`).join('\n')}`;
+      }
+    }
+
+    return `Hoàng An ơi, đây là ${imgLabel} của ${callName} trong lĩnh vực ${industryCtx}.${techSpecs}${technicalContext}
 ${userContext}
 Yêu cầu cho lượt trả lời đầu tiên:
 1. Nêu ấn tượng thị giác đầu tiên của bạn: Chỉ 2 đến 3 câu trực diện, sắc sảo và chân thực.
 2. Đánh giá tổng quan: Viết đúng cú pháp 1 dòng riêng: "Đánh giá tổng quan: X/10 điểm - [Đạt chuẩn / Chưa đạt chuẩn]".
-3. Câu hỏi mở ngắn gọn: Hỏi ${callName} muốn tìm hiểu trước về: Người xem thấy gì trước, Điểm làm tốt, hay Điểm chưa ổn cần sửa.
+3. Câu hỏi mở ngắn gọn: Hỏi ${callName} muốn tìm hiểu trước về: Người xem thấy gì trước, Điểm làm tốt, hay Điểm chưa ổn cần sửa${campaignGoal === 'sales' ? ' (đặc biệt tập trung vào hạt sạn cản trở tỷ lệ bấm mua)' : ''}.
 QUY TẮC CỐT LÕI: Giữ câu trả lời cô đọng dưới 80 từ. Không phân tích tràn lan, để dành cho các lượt trao đổi tiếp theo.`;
   },
 
@@ -259,6 +294,187 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
     }
 
     return result;
+  },
+
+  // ===========================================================================
+  // VÒNG 2 BRIEFING: HỎI KÊNH PHÂN PHỐI & MỤC TIÊU CHIẾN DỊCH
+  // ===========================================================================
+
+  /**
+   * Sinh câu phản hồi sau khi AI đã nhận được tên + ngành hàng (hết Vòng 1).
+   * Kết thúc bằng câu hỏi Briefing kép: Kênh chạy + Mục tiêu chiến dịch.
+   * @param {string} callName - Tên gọi người dùng
+   * @param {string} industry - Ngành hàng đã nhận diện
+   * @returns {string[]} Mảng các dòng để stream
+   */
+  buildOnboardingToBriefing(callName, industry) {
+    const industryHint = this.getIndustryTechHint(industry);
+    return [
+      `Tuyệt vời ${callName}! ${industryHint}`,
+      `Để mình thẩm định đúng chuẩn nhà nghề, mình cần hỏi thêm ${callName} 2 điều quan trọng nhé!`,
+      `${callName} dự định chạy hình ảnh này trên kênh nào (ví dụ: Facebook Feed, Instagram Story, TikTok, Shopee...)?`,
+      `Và mục tiêu chính của đợt chạy này là gì — giới thiệu ưu đãi để khách chốt đơn ngay, hay khai trương/nhận diện thương hiệu?`
+    ];
+  },
+
+  /**
+   * Gợi ý kỹ thuật ngắn gọn được kích hoạt theo ngành hàng.
+   * Giúp người dùng cảm nhận AI thực sự "biết nghề".
+   */
+  getIndustryTechHint(industry) {
+    if (!industry) return "Với sản phẩm này, thị giác đóng vai trò quyết định đến cảm xúc mua hàng của khách.";
+    const lower = industry.toLowerCase();
+    if (lower.includes('f&b') || lower.includes('thực phẩm') || lower.includes('ẩm thực')) {
+      return "Với món ăn/đồ uống thì thị giác đóng vai trò quyết định đến 80% cơn thèm ăn của khách — gam màu Cam/Đỏ/Vàng và ánh sáng studio là chìa khóa.";
+    }
+    if (lower.includes('thời trang')) {
+      return "Với thời trang, nguyên tắc \"Khoảng thở thị giác\" (Negative Space) và phân cấp font chữ tối giản là yếu tố sống còn để tôn sản phẩm.";
+    }
+    if (lower.includes('mỹ phẩm') || lower.includes('làm đẹp')) {
+      return "Với mỹ phẩm và làm đẹp, tông màu pastel/nude phải đảm bảo độ tương phản đủ 4.5:1 theo chuẩn WCAG để nút CTA không bị \"chìm\" vào nền.";
+    }
+    if (lower.includes('công nghệ')) {
+      return "Với sản phẩm công nghệ, bố cục lưới kỹ hà (Grid System 12 cột) và độ chính xác pixel của ảnh product shot là thước đo uy tín thương hiệu.";
+    }
+    if (lower.includes('bất động sản')) {
+      return "Với bất động sản, bố cục phân chia vùng thị giác 60-30-10 (ảnh chủ thể - thông tin - CTA) quyết định tỷ lệ giữ chân người xem.";
+    }
+    return "Với ngành hàng này, bố cục bộ ba Chủ thể - Thông điệp - Kêu gọi hành động phải được phân cấp rõ ràng để khách bấm vào ngay khi lướt qua.";
+  },
+
+  /**
+   * Trích xuất Kênh phân phối và Mục tiêu chiến dịch từ câu trả lời briefing.
+   * @param {string} rawText - Câu trả lời thô của người dùng
+   * @returns {{ platform: string, goal: string, platformLabel: string, goalLabel: string }}
+   */
+  parseBriefingAnswer(rawText) {
+    if (!rawText) return { platform: '', goal: '', platformLabel: '', goalLabel: '' };
+    const lower = rawText.toLowerCase();
+
+    // --- Nhận diện Kênh phân phối ---
+    let platform = '';
+    let platformLabel = '';
+    if (/\b(facebook feed|fb feed|feed facebook|bảng tin facebook|news feed)\b/i.test(lower)) {
+      platform = 'facebook_feed'; platformLabel = 'Facebook Feed 1:1';
+    } else if (/\b(facebook story|story facebook|fb story)\b/i.test(lower)) {
+      platform = 'facebook_story'; platformLabel = 'Facebook Story 9:16';
+    } else if (/\b(instagram feed|ig feed|instagram)\b/i.test(lower) && !/story/i.test(lower)) {
+      platform = 'instagram_feed'; platformLabel = 'Instagram Feed 1:1';
+    } else if (/\b(instagram story|ig story|reels|instagram reels)\b/i.test(lower)) {
+      platform = 'instagram_story'; platformLabel = 'Instagram Story/Reels 9:16';
+    } else if (/\btiktok\b/i.test(lower)) {
+      platform = 'tiktok'; platformLabel = 'TikTok 9:16';
+    } else if (/\b(shopee|lazada|tiki|sàn|tmđt|thương mại điện tử)\b/i.test(lower)) {
+      platform = 'ecommerce'; platformLabel = 'Sàn TMĐT (Shopee/Lazada)';
+    } else if (/\b(google|gdn|display)\b/i.test(lower)) {
+      platform = 'google_display'; platformLabel = 'Google Display Network';
+    } else if (/\b(facebook|fb|meta)\b/i.test(lower)) {
+      platform = 'facebook_feed'; platformLabel = 'Facebook';
+    }
+
+    // --- Nhận diện Mục tiêu chiến dịch ---
+    let goal = '';
+    let goalLabel = '';
+    if (/\b(bán hàng|chốt đơn|mua ngay|đặt ngay|tăng doanh|conversion|chuyển đổi|ưu đãi|giảm giá|khuyến mãi|flash sale|combo)\b/i.test(lower)) {
+      goal = 'sales'; goalLabel = 'Chốt đơn / Bán hàng';
+    } else if (/\b(nhận diện|thương hiệu|brand|awareness|ra mắt|khai trương|giới thiệu sản phẩm|launch)\b/i.test(lower)) {
+      goal = 'branding'; goalLabel = 'Nhận diện thương hiệu';
+    } else if (/\b(traffic|lượng truy cập|click|tăng follow|tăng lượt|engagement|tương tác)\b/i.test(lower)) {
+      goal = 'engagement'; goalLabel = 'Tăng tương tác / Traffic';
+    } else if (/\b(lead|thu thập|thông tin|đăng ký|form|liên hệ)\b/i.test(lower)) {
+      goal = 'lead_gen'; goalLabel = 'Thu thập khách hàng tiềm năng';
+    }
+
+    return { platform, goal, platformLabel, goalLabel };
+  },
+
+  /**
+   * Sinh câu phản hồi sau khi đã nhận đủ brief (Kênh + Mục tiêu).
+   * Kích hoạt đúng bộ quy chuẩn kỹ thuật phù hợp và mời gửi ảnh.
+   */
+  buildBriefingConfirm(callName, platformLabel, goalLabel, platform, goal) {
+    const techRules = this.getTechRulesForContext(platform, goal);
+    return [
+      `Rõ rồi ${callName}! Mình đã ghi nhận đủ thông tin brief rồi.`,
+      techRules,
+      `${callName} bấm vào biểu tượng kẹp giấy 📎 ở dưới để gửi hình ảnh quảng cáo cho mình xem nhé — mình sẽ thẩm định ngay!`
+    ];
+  },
+
+  /**
+   * Sinh đoạn mô tả bộ quy chuẩn kỹ thuật được kích hoạt.
+   * Đây là điểm "WOW" giúp người dùng cảm thấy AI biết nghề thực sự.
+   */
+  getTechRulesForContext(platform, goal) {
+    const rules = [];
+
+    // Quy chuẩn theo Kênh
+    if (platform === 'facebook_feed' || platform === 'instagram_feed') {
+      rules.push('**Kênh Feed 1:1:** Mình sẽ kiểm tra mật độ chữ (Text Rule < 20% diện tích), bố cục lưới 3x3 và vùng trọng tâm thị giác.');
+    } else if (platform === 'facebook_story' || platform === 'instagram_story' || platform === 'tiktok') {
+      rules.push('**Kênh Story/TikTok 9:16:** Mình sẽ kiểm tra vùng an toàn (safe-zone) tránh bị icon nền tảng che, và sức hút trong 3 giây đầu tiên.');
+    } else if (platform === 'ecommerce') {
+      rules.push('**Sàn TMĐT:** Mình sẽ kiểm tra khoảng trắng nền trắng, độ nổi bật của giá/ưu đãi và chất lượng ảnh product shot.');
+    }
+
+    // Quy chuẩn theo Mục tiêu
+    if (goal === 'sales') {
+      rules.push('**Mục tiêu Chốt đơn:** Mình sẽ ưu tiên kiểm tra vị trí và độ tương phản của nút CTA — phải nổi bật cực đại tại điểm rơi thị giác góc dưới bên phải.');
+    } else if (goal === 'branding') {
+      rules.push('**Mục tiêu Nhận diện thương hiệu:** Mình sẽ tập trung vào sự nhất quán màu sắc thương hiệu, tỷ lệ logo an toàn và tính thẩm mỹ tổng thể.');
+    } else if (goal === 'engagement') {
+      rules.push('**Mục tiêu Tương tác:** Mình sẽ đánh giá yếu tố dừng ngón tay (thumb-stopping) — hình ảnh có đủ tương phản và câu hook đủ mạnh để người lướt phải dừng lại không.');
+    }
+
+    if (rules.length === 0) return 'Mình sẽ đánh giá toàn diện theo 22 quy chuẩn thiết kế quảng cáo chuyên nghiệp.';
+    return rules.join(' ');
+  },
+
+  // ===========================================================================
+  // VÒNG 5 ACTIONABLE: HƯỚNG DẪN FIX CỤ THỂ (theo lựa chọn của người dùng)
+  // ===========================================================================
+
+  /**
+   * Sinh prompt cho các action fix cụ thể (Vòng 5).
+   * Người dùng chọn muốn sửa CTA màu hay Typography hay bố cục.
+   */
+  buildActionableFixPrompt(callName, actionType, platform, goal) {
+    const platformCtx = platform ? `Kênh chạy: ${platform}.` : '';
+    const goalCtx = goal ? `Mục tiêu: ${goal}.` : '';
+    const context = [platformCtx, goalCtx].filter(Boolean).join(' ');
+
+    const prompts = {
+      fix_cta_color: `${callName} muốn hướng dẫn chỉnh màu nút CTA để nổi bật hơn. ${context}
+Hãy:
+1. Xác định màu nền hiện tại của ảnh và màu nút CTA đang dùng.
+2. Áp dụng Vòng tròn màu Schopenhauer: gợi ý cặp màu tương phản tối đa (ví dụ: nền đỏ → nút vàng #F59E0B, nền tối → nút trắng viền vàng).
+3. Đưa ra mã màu HEX cụ thể và giải thích ngắn lý do tâm lý màu sắc (dưới 4 câu).
+Cuối cùng hỏi ${callName} muốn chỉnh trên Canva/Photoshop hay muốn Prompt AI vẽ lại ảnh mới.`,
+
+      fix_typography: `${callName} muốn chỉnh bố cục chữ và khoảng cách dòng. ${context}
+Hãy:
+1. Chỉ ra vấn đề cụ thể về phân cấp chữ đang có trong ảnh (tiêu đề - phụ đề - CTA).
+2. Đề xuất line-height cụ thể (ví dụ: từ 1.0x lên 1.3x), letter-spacing và font weight phù hợp.
+3. Gợi ý 1 cặp font miễn phí trên Google Fonts phù hợp với ngành hàng (dưới 4 câu).
+Cuối cùng hỏi ${callName} có muốn mình tạo Prompt vẽ lại bức ảnh mới chuẩn bố cục không.`,
+
+      fix_layout: `${callName} muốn chỉnh lại bố cục tổng thể. ${context}
+Hãy:
+1. Mô tả bố cục hiện tại đang mắc lỗi gì (nhồi nhét, thiếu khoảng thở, sai điểm rơi thị giác...).
+2. Đề xuất sắp xếp lại theo Quy tắc 1/3 (Rule of Thirds) với lưới 3x3: chủ thể đặt ở đâu, văn bản đặt ở đâu, CTA đặt ở đâu.
+3. Chỉ ra 1-2 phần tử nên xóa để tạo Negative Space (khoảng thở thị giác) (dưới 4 câu).`,
+
+      platform_specs: `${callName} muốn biết thông số kỹ thuật chuẩn cho kênh đang chạy. ${context}
+Hãy cung cấp bảng thông số gọn gàng:
+- Kích thước ảnh chuẩn (px)
+- Tỷ lệ khung hình
+- Giới hạn mật độ chữ (nếu có)
+- Vùng an toàn (safe-zone) cần chừa ra
+- Thời gian tối ưu hiển thị (nếu là video/story)
+Sau đó hỏi ${callName} có muốn mình tạo Prompt AI để vẽ lại ảnh đúng chuẩn kênh không.`
+    };
+
+    return prompts[actionType] || null;
   },
 
   // Lấy tên ngẫu nhiên trong danh sách biến thể để xưng hô tự nhiên

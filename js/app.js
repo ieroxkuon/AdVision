@@ -27,7 +27,21 @@ const AppController = {
     attachedImages: [],
     activeImageData: null,
     conversationHistory: [],
-    conversationStage: 'idle', // idle | image_overview | deep_dive | done
+    /**
+     * STATE MACHINE - 6 VÒNG HỘI THOẠI (Theo kịch bản Art Director)
+     * -------------------------------------------------------------------
+     * 'idle'           → Vòng 1: Chào hỏi, chưa biết tên
+     * 'onboarding'     → Vòng 1: Đã biết tên, đang hỏi ngành hàng
+     * 'briefing'       → Vòng 2: Đã biết ngành, đang hỏi kênh + mục tiêu
+     * 'awaiting_image' → Vòng 2 done: Đã có đủ brief, mời gửi ảnh
+     * 'image_overview' → Vòng 3: Đã nhận ảnh, hiển thị đánh giá 2 giây đầu
+     * 'deep_dive'      → Vòng 4: Phân tích hạt sạn / điểm sáng chi tiết
+     * 'actionable'     → Vòng 5: Hướng dẫn fix cụ thể (màu CTA, typography...)
+     * 'done'           → Vòng 6: Đã tạo Prompt AI tái thiết kế
+     */
+    conversationStage: 'idle',
+    // Lưu mục tiêu chiến dịch đã được briefing (vd: "sales", "branding", "launch")
+    campaignGoal: (() => { try { return localStorage.getItem('adv_campaign_goal') || ""; } catch(e) { return ""; } })(),
     lastFailedRequest: null    // Lưu lại request để retry khi lỗi API
   },
 
@@ -58,10 +72,21 @@ const AppController = {
         const callName = (window.PersonaPrompt && PersonaPrompt.getDynamicCallName) 
           ? PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName)
           : (this.state.userName || "bạn");
-        UIController.streamLines([
-          `Chào ${callName}, rất vui được gặp lại bạn!`,
-          `Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`
-        ]);
+
+        // Khôi phục stage phù hợp dựa trên dữ liệu localStorage
+        if (this.state.userIndustry && this.state.userPlatform) {
+          this.state.conversationStage = 'awaiting_image';
+        } else if (this.state.userIndustry) {
+          this.state.conversationStage = 'briefing';
+        } else {
+          this.state.conversationStage = 'onboarding';
+        }
+
+        const welcomeBack = this.state.userPlatform
+          ? `Chào ${callName}, rất vui được gặp lại! Mình thấy bạn đang chạy chiến dịch trên **${this.state.userPlatform}**. Bạn đã chuẩn bị ảnh quảng cáo chưa nhỉ — bấm 📎 để gửi mình xem nhé!`
+          : `Chào ${callName}, rất vui được gặp lại bạn! Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`;
+        UIController.streamLines([welcomeBack]);
+        this.updateSystemStatus();
       }
     } catch (err) {
       console.error("AdVision Init Error:", err);
@@ -76,9 +101,12 @@ const AppController = {
       UIController.elements.inputApiKey.value = key;
     }
     UIController.updateApiStatusIndicator(!!key);
-    UIController.updateUserBadge(this.state.userName, this.state.userIndustry);
+    UIController.updateUserBadge(this.state.userName, this.state.userIndustry, this.state.userPlatform);
     const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
-    UIController.updateInputPlaceholder(this.state.userName, this.state.userIndustry, callName, this.state.attachedImages.length);
+    UIController.updateInputPlaceholder(
+      this.state.userName, this.state.userIndustry, callName,
+      this.state.attachedImages.length, this.state.conversationStage
+    );
   },
 
   // Lời chào mở đầu
@@ -130,6 +158,7 @@ const AppController = {
           this.state.userName = "";
           this.state.userIndustry = "";
           this.state.userPlatform = "";
+          this.state.campaignGoal = "";
           this.state.nameVariations = [];
           this.state.activeImageData = null;
           this.state.conversationHistory = [];
@@ -139,6 +168,7 @@ const AppController = {
           localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY);
           localStorage.removeItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS);
           localStorage.removeItem('adv_user_platform');
+          localStorage.removeItem('adv_campaign_goal');
           this.clearAllAttachments();
           this.updateSystemStatus();
           this.playInitialGreeting();
@@ -225,6 +255,26 @@ const AppController = {
     }
     const chatInput = UIController.elements.chatInput;
     if (!chatInput) return;
+
+    // Briefing quick actions: chọn kênh phân phối
+    const briefingPlatformMap = {
+      'briefing_fb_feed':    'Mình chạy Facebook Feed, ảnh vuông 1:1',
+      'briefing_ig_story':   'Mình chạy Instagram Story 9:16',
+      'briefing_tiktok':     'Mình chạy TikTok 9:16',
+      'briefing_ecommerce':  'Mình chạy trên Shopee/Lazada'
+    };
+    if (briefingPlatformMap[actionKey]) {
+      chatInput.value = briefingPlatformMap[actionKey];
+      this.handleChatSubmit();
+      return;
+    }
+
+    // Actionable fix quick actions (Vòng 5)
+    const actionableKeys = ['fix_cta_color', 'fix_typography', 'fix_layout', 'platform_specs'];
+    if (actionableKeys.includes(actionKey)) {
+      this.handleActionableFix(actionKey);
+      return;
+    }
 
     // Khi là topic key thì xử lý theo flow hội thoại chuyên sâu
     const topicKeys = [
@@ -331,9 +381,9 @@ const AppController = {
         { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
       ],
       fix_order: [
-        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: 'Tối ưu cho Facebook', action: 'platform_fb' },
-        { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+        { text: '🎨 Hướng dẫn chỉnh màu nút CTA', action: 'fix_cta_color' },
+        { text: '✍️ Chỉnh bố cục chữ & khoảng cách', action: 'fix_typography' },
+        { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' }
       ],
       platform_fb: [
         { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
@@ -373,6 +423,72 @@ const AppController = {
     return map[topic] || [];
   },
 
+  // Cập nhật quick actions sau fix_order theo context kênh & mục tiêu (Vòng 4 → Vòng 5)
+  getActionableActionsForContext() {
+    const actions = [
+      { text: '🎨 Hướng dẫn chỉnh màu nút CTA', action: 'fix_cta_color' },
+      { text: '✍️ Chỉnh bố cục chữ & khoảng cách', action: 'fix_typography' }
+    ];
+    if (this.state.userPlatform) {
+      actions.push({ text: `📐 Thông số chuẩn ${this.state.userPlatform}`, action: 'platform_specs' });
+    }
+    actions.push({ text: '🤖 Tạo Prompt AI vẽ lại ảnh mới', action: 'redesign_prompt' });
+    return actions;
+  },
+
+  // Vòng 5: Xử lý hướng dẫn fix cụ thể (CTA màu, typography, layout, thông số kênh)
+  async handleActionableFix(actionType) {
+    if (UIController.isAiTyping) return;
+    const apiKey = AdvConfig.getEffectiveApiKey();
+    if (!apiKey) return;
+
+    const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
+    const systemPrompt = PersonaPrompt.getSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform);
+    const fixPrompt = PersonaPrompt.buildActionableFixPrompt(
+      callName, actionType, this.state.userPlatform, this.state.campaignGoal
+    );
+    if (!fixPrompt) return;
+
+    const actionLabels = {
+      fix_cta_color:   '🎨 Hướng dẫn chỉnh màu nút CTA',
+      fix_typography:  '✍️ Chỉnh bố cục chữ & khoảng cách',
+      fix_layout:      '📐 Chỉnh lại bố cục tổng thể',
+      platform_specs:  '📋 Thông số kỹ thuật chuẩn kênh'
+    };
+    UIController.appendUserMessage(actionLabels[actionType] || actionType, []);
+    UIController.showTypingIndicator("Đang chuẩn bị hướng dẫn chi tiết...");
+
+    let apiResponse = '';
+    try {
+      apiResponse = await ApiService.chatNextTurn({
+        apiKey, text: fixPrompt, systemPrompt,
+        conversationHistory: this.state.conversationHistory,
+        activeImageData: this.state.activeImageData
+      });
+    } catch (err) {
+      UIController.hideTypingIndicator();
+      this.showApiError(err.message, () => this.handleActionableFix(actionType));
+      return;
+    }
+
+    UIController.hideTypingIndicator();
+    this.state.conversationHistory.push({ role: 'user', text: fixPrompt });
+    this.state.conversationHistory.push({ role: 'model', text: apiResponse });
+    this.state.conversationStage = 'actionable';
+
+    const lines = apiResponse.split('\n')
+      .map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
+
+    // Sau Vòng 5 → gợi ý Vòng 6 (Prompt AI)
+    const nextActions = [
+      { text: '🤖 Tạo Prompt AI vẽ lại ảnh mới', action: 'redesign_prompt' }
+    ];
+    if (actionType !== 'fix_cta_color') nextActions.unshift({ text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' });
+    if (actionType !== 'fix_typography') nextActions.unshift({ text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' });
+
+    await UIController.streamLines(lines, nextActions);
+  },
+
   // Xử lý gửi tin nhắn người dùng
   async handleChatSubmit() {
     if (UIController.isAiTyping) return;
@@ -390,6 +506,9 @@ const AppController = {
     // Tự động nhận diện ngữ cảnh (tên, ngành hàng, nền tảng) từ tin nhắn của người dùng
     if (text) {
       const detected = PersonaPrompt.detectContextFromText(text);
+      const wasNameKnown = !!this.state.userName;
+
+      // Nhận diện tên
       if (detected.userName && !this.state.userName) {
         this.state.userName = detected.userName;
         this.state.nameVariations = detected.nameVariations || [detected.userName];
@@ -405,14 +524,18 @@ const AppController = {
         }
       }
 
-      if (detected.userIndustry) {
+      // Nhận diện ngành hàng
+      if (detected.userIndustry && !this.state.userIndustry) {
         this.state.userIndustry = detected.userIndustry;
         localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry);
       }
+
+      // Nhận diện kênh phân phối
       if (detected.userPlatform) {
         this.state.userPlatform = detected.userPlatform;
         localStorage.setItem('adv_user_platform', this.state.userPlatform);
       }
+
       this.updateSystemStatus();
     }
 
@@ -429,6 +552,78 @@ const AppController = {
     }
 
     const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
+
+    // =========================================================================
+    // VÒNG 1 → VÒNG 2: Sau khi biết tên + ngành hàng → chuyển sang Briefing
+    // =========================================================================
+    // Điều kiện: chưa có thông tin kênh, chưa có ảnh, và tin nhắn không phải câu hỏi
+    if (
+      this.state.conversationStage === 'idle' || this.state.conversationStage === 'onboarding'
+    ) {
+      const hasName = !!this.state.userName;
+      const hasIndustry = !!this.state.userIndustry;
+      const hasPlatform = !!this.state.userPlatform;
+      const hasCampaignGoal = !!this.state.campaignGoal;
+
+      // Nếu vừa nhận được tên hoặc ngành → chuyển sang hỏi briefing (kênh + mục tiêu)
+      if (hasName && hasIndustry && !hasPlatform && !hasCampaignGoal && sentImages.length === 0) {
+        this.state.conversationStage = 'briefing';
+        UIController.showTypingIndicator("Đang chuẩn bị câu hỏi briefing...");
+        await UIController.delay(800);
+        UIController.hideTypingIndicator();
+
+        const briefingLines = PersonaPrompt.buildOnboardingToBriefing(callName, this.state.userIndustry);
+        await UIController.streamLines(briefingLines, [
+          { text: '📱 Facebook Feed 1:1', action: 'briefing_fb_feed' },
+          { text: '📱 Instagram Story 9:16', action: 'briefing_ig_story' },
+          { text: '🎵 TikTok 9:16', action: 'briefing_tiktok' },
+          { text: '🛒 Shopee/Lazada', action: 'briefing_ecommerce' }
+        ]);
+        this.updateSystemStatus();
+        return;
+      }
+    }
+
+    // =========================================================================
+    // VÒNG 2 → CHỜ ẢNH: Người dùng trả lời về kênh + mục tiêu → xác nhận brief
+    // =========================================================================
+    if (this.state.conversationStage === 'briefing' && sentImages.length === 0 && text) {
+      const briefing = PersonaPrompt.parseBriefingAnswer(text);
+
+      // Cập nhật kênh nếu tìm thấy
+      if (briefing.platform) {
+        this.state.userPlatform = briefing.platformLabel;
+        localStorage.setItem('adv_user_platform', this.state.userPlatform);
+      }
+      // Cập nhật mục tiêu nếu tìm thấy
+      if (briefing.goal) {
+        this.state.campaignGoal = briefing.goal;
+        localStorage.setItem('adv_campaign_goal', this.state.campaignGoal);
+      }
+
+      // Nếu đã đủ cả kênh lẫn mục tiêu → xác nhận brief và mời gửi ảnh
+      const finalPlatform = briefing.platform || '';
+      const finalGoal = briefing.goal || '';
+      const finalPlatformLabel = briefing.platformLabel || this.state.userPlatform || 'kênh đã chọn';
+      const finalGoalLabel = briefing.goalLabel || this.state.campaignGoal || 'mục tiêu đã chọn';
+
+      if (finalPlatform || finalGoal) {
+        this.state.conversationStage = 'awaiting_image';
+        UIController.showTypingIndicator("Đang tổng hợp thông tin brief...");
+        await UIController.delay(900);
+        UIController.hideTypingIndicator();
+
+        const confirmLines = PersonaPrompt.buildBriefingConfirm(
+          callName, finalPlatformLabel, finalGoalLabel, finalPlatform, finalGoal
+        );
+        await UIController.streamLines(confirmLines, [
+          { text: '📎 Gửi ảnh để thẩm định ngay', action: '__attach__' }
+        ]);
+        this.updateSystemStatus();
+        return;
+      }
+      // Nếu không parse được kênh/mục tiêu → để AI trả lời tự nhiên (fall through)
+    }
     const systemPrompt = PersonaPrompt.getSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform);
 
     // BƯỚC 3: NGƯỜI DÙNG GỬI ẢNH -> THẨM ĐỊNH TỪNG ẢNH MỘT
@@ -464,7 +659,9 @@ const AppController = {
           i,
           sentImages.length,
           text,
-          featureSummary
+          featureSummary,
+          this.state.userPlatform,
+          this.state.campaignGoal
         );
 
         let apiResponse = "";
@@ -516,19 +713,40 @@ const AppController = {
           .filter(l => l.length > 0);
 
         const isLast = (i === sentImages.length - 1);
-        // Quick actions sau overview: đúng theo flow hội thoại mẫu
-        const quickActions = isLast ? (
-          sentImages.length > 1 ? [
-            { text: 'So sánh ảnh nào tốt hơn', action: 'compare' },
-            { text: 'Người xem thấy gì trước?', action: 'first_impression' },
-            { text: 'Chỗ nào làm tốt?', action: 'strengths' },
-            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
-          ] : [
-            { text: 'Người xem thấy gì trước?', action: 'first_impression' },
-            { text: 'Chỗ nào làm tốt?', action: 'strengths' },
-            { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' }
-          ]
-        ) : null;
+
+        // Quick actions sau overview: thay đổi động theo mục tiêu chiến dịch (Bước 5)
+        let quickActions = null;
+        if (isLast) {
+          if (sentImages.length > 1) {
+            // Nhiều ảnh: ưu tiên so sánh trước
+            quickActions = [
+              { text: '⚖️ So sánh ảnh nào tốt hơn', action: 'compare' },
+              { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' },
+              { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
+            ];
+          } else if (this.state.campaignGoal === 'sales') {
+            // Mục tiêu bán hàng: ưu tiên phân tích hạt sạn cản chuyển đổi
+            quickActions = [
+              { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+              { text: '✨ Điểm sáng của ảnh', action: 'strengths' },
+              { text: '👁️ Mắt người xem dừng ở đâu?', action: 'first_impression' }
+            ];
+          } else if (this.state.campaignGoal === 'branding') {
+            // Mục tiêu brand: ưu tiên điểm mạnh và nhận diện
+            quickActions = [
+              { text: '✨ Điểm sáng nhận diện thương hiệu', action: 'strengths' },
+              { text: '⚠️ Điểm chưa nhất quán', action: 'weaknesses' },
+              { text: '👁️ Ấn tượng thị giác đầu tiên', action: 'first_impression' }
+            ];
+          } else {
+            // Default: flow chuẩn
+            quickActions = [
+              { text: '👁️ Người xem thấy gì trước?', action: 'first_impression' },
+              { text: '✨ Chỗ nào làm tốt?', action: 'strengths' },
+              { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' }
+            ];
+          }
+        }
 
         if (sentImages.length > 1) {
           lines.unshift(`📸 BỨC ẢNH ${i + 1}/${sentImages.length}: ${currentImg.fileName}`);
@@ -611,9 +829,9 @@ const AppController = {
           ];
         } else if (lower.includes('sửa') || lower.includes('đề xuất') || lower.includes('chỉnh')) {
           nextActions = [
-            { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-            { text: 'Tối ưu cho Facebook', action: 'platform_fb' },
-            { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+            { text: '🎨 Hướng dẫn chỉnh màu nút CTA', action: 'fix_cta_color' },
+            { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' },
+            { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' }
           ];
         } else if (this.state.conversationStage === 'image_overview') {
           nextActions = [

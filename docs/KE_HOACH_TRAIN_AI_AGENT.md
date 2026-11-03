@@ -1,6 +1,5 @@
 KE HOACH XAY DUNG AI AGENT
-Phan tich va danh gia hinh anh quang cao
-
+NGHIÊN CỨU VÀ XÂY DỰNG AI AGENT HỖ TRỢ PHÂN TÍCH, ĐÁNH GIÁ VÀ TỐI ƯU HÌNH ẢNH QUẢNG CÁO SỬ DỤNG MÔ HÌNH THỊ GIÁC NGÔN NGỮ
 
 
 1. MO TA AI AGENT

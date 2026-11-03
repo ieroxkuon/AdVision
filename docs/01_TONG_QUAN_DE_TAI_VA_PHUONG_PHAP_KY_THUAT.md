@@ -1,6 +1,6 @@
 # TÀI LIỆU 1: NGHIÊN CỨU TỔNG QUAN ĐỀ TÀI VÀ PHƯƠNG PHÁP KỸ THUẬT ÁP DỤNG
 
-**Đề tài:** Hệ thống cố vấn thẩm định & đánh giá tiêu chuẩn hình ảnh quảng cáo ứng dụng AI Agent Multimodal  
+**Đề tài:** HNGHIÊN CỨU VÀ XÂY DỰNG AI AGENT HỖ TRỢ PHÂN TÍCH, ĐÁNH GIÁ VÀ TỐI ƯU HÌNH ẢNH QUẢNG CÁO SỬ DỤNG MÔ HÌNH THỊ GIÁC NGÔN NGỮ  
 **Sinh viên:** Trần Thái Cương — MSSV: 2255010026  
 **Thời gian:** Tuần 1–2
 

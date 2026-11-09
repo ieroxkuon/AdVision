@@ -241,8 +241,8 @@ const UIController = {
     if (/^\[GỢI Ý PROMPT.*?\]\s*$/i.test(line)) return 'redesign-prompt-header';
     if (/^\[.+\]\s*$/.test(line)) return 'block-header';
     if (/^📸\s/.test(line)) return 'image-label';
-    if (/^(Đánh giá( tổng quan)?:?\s*\d+(\.\d+)?\/10|\b\d+(\.\d+)?\/10\s*điểm)/i.test(line)) return 'score-badge';
-    if (/^(Điểm nghẽn|Hạt sạn|Lỗi|Điểm chưa ổn|Vấn đề)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Điểm nghẽn|Hạt sạn|Lỗi|Điểm chưa ổn)/i.test(line)) return 'flaw-card';
+    if (/^(Đánh giá( tổng quan| sơ bộ)?:?\s*\d+(\.\d+)?\/10|\b\d+(\.\d+)?\/10\s*điểm)/i.test(line)) return 'score-badge';
+    if (/^(Điểm nghẽn|Hạt sạn|Lỗi|Điểm chưa ổn|Vấn đề)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Điểm nghẽn|Hạt sạn|Lỗi|Điểm chưa ổn)/i.test(line) || /^🔴/.test(line)) return 'flaw-card';
     if (/^(Điểm sáng|Ưu điểm|Điểm mạnh|Điểm làm tốt)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Điểm sáng|Ưu điểm|Điểm mạnh)/i.test(line)) return 'strength-card';
     if (/^(Đề xuất|Khuyến nghị|Bước\s+\d+|Giải pháp)(\s+thứ|\s+\d+|:)/i.test(line) || /^-\s*(Đề xuất|Bước\s+\d+)/i.test(line)) return 'recommendation-card';
     if (/^(Theo bạn|Bạn muốn|Bạn nghĩ sao|Bạn định|Bạn có muốn)/i.test(line) && line.includes('?')) return 'question-card';
@@ -266,8 +266,8 @@ const UIController = {
       .replace(/`([^`]+?)`/g, '<code class="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-xs font-mono text-indigo-600 dark:text-indigo-400 border border-slate-200 dark:border-slate-700">$1</code>');
   },
 
-  // Tiện ích hiển thị chữ từng từ mượt mà (tương đương tốc độ ChatGPT)
-  async streamTextToElement(targetEl, text, wordDelay = 16) {
+  // Tiện ích hiển thị chữ từng từ mượt mà (tốc độ cao, không giật lag)
+  async streamTextToElement(targetEl, text, wordDelay = 8) {
     const tokens = text.split(/(\s+)/);
     for (const token of tokens) {
       targetEl.textContent += token;
@@ -401,7 +401,7 @@ const UIController = {
           `;
           container.appendChild(el);
           const descTarget = el.lastElementChild;
-          await this.streamTextToElement(descTarget, desc, 16);
+          await this.streamTextToElement(descTarget, desc, 8);
           continue;
         }
       }
@@ -422,7 +422,7 @@ const UIController = {
           `;
           container.appendChild(el);
           const descTarget = el.lastElementChild;
-          await this.streamTextToElement(descTarget, desc, 16);
+          await this.streamTextToElement(descTarget, desc, 8);
           continue;
         }
       }
@@ -443,7 +443,7 @@ const UIController = {
           `;
           container.appendChild(el);
           const descTarget = el.lastElementChild;
-          await this.streamTextToElement(descTarget, desc, 16);
+          await this.streamTextToElement(descTarget, desc, 8);
           continue;
         }
       }
@@ -454,7 +454,7 @@ const UIController = {
         el.innerHTML = `<span class="mt-0.5 w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900 text-violet-600 dark:text-violet-300 flex items-center justify-center text-[10px] shrink-0 font-bold"><i class="fa-solid fa-comments"></i></span><div></div>`;
         container.appendChild(el);
         const textTarget = el.lastElementChild;
-        await this.streamTextToElement(textTarget, line, 18);
+        await this.streamTextToElement(textTarget, line, 8);
         continue;
       }
 
@@ -482,7 +482,7 @@ const UIController = {
       if (type === 'section-title') {
         el.className += ' font-semibold text-slate-900 dark:text-white text-[15px] pt-1.5';
         container.appendChild(el);
-        await this.streamTextToElement(el, line.replace(/^-\s+/, ''), 16);
+        await this.streamTextToElement(el, line.replace(/^-\s+/, ''), 8);
         continue;
       }
 
@@ -492,7 +492,7 @@ const UIController = {
         el.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-indigo-500 mt-2 shrink-0"></span><span class="flex-1"></span>`;
         container.appendChild(el);
         const target = el.lastElementChild;
-        await this.streamTextToElement(target, line, 16);
+        await this.streamTextToElement(target, line, 8);
         continue;
       }
 
@@ -502,14 +502,14 @@ const UIController = {
         el.innerHTML = `<span class="text-indigo-500 font-bold shrink-0 mt-0.5">•</span><span class="flex-1"></span>`;
         container.appendChild(el);
         const target = el.lastElementChild;
-        await this.streamTextToElement(target, line.replace(/^-\s+/, ''), 16);
+        await this.streamTextToElement(target, line.replace(/^-\s+/, ''), 8);
         continue;
       }
 
       // 11. Đoạn văn bản thông thường (Stream từng từ chuẩn tốc độ ChatGPT)
       el.className += ' font-normal text-slate-800 dark:text-slate-200 leading-relaxed text-[15px]';
       container.appendChild(el);
-      await this.streamTextToElement(el, line, 16);
+      await this.streamTextToElement(el, line, 8);
     }
 
     if (actionButtons && actionButtons.length > 0) {

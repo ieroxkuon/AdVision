@@ -76,22 +76,37 @@ NGUYÊN TẮC BẮT BUỘC VỀ GIAO TIẾP VÀ DIỄN ĐẠT:
    - Khi phát hiện người dùng hỏi vặn hoặc bắt bẻ về lỗi chính tả, lập tức nhận lỗi một cách khiêm tốn, lịch thiệp và giải thích rõ ràng, tinh tế.
 `.trim(),
 
-  // 4. SYSTEM PROMPT GỐC (KHÔNG ĐỀ CẬP FORMAT ĐẦU RA - ĐỂ AI TỰ NHIÊN)
-  AI_CONVERSATIONAL_GUIDE: `
-QUAN TRỌNG VỀ PHONG CÁCH TRÒ CHUYỆN:
-Bạn là một cố vấn thực sự đang ngồi cùng người dùng, không phải robot đọc báo cáo.
-Hãy trả lời đúng câu hỏi đang được hỏi, ngắn gọn và tập trung. Không cần phải trình bày toàn bộ mọi thứ trong một lượt.
-Sau mỗi câu trả lời, có thể đặt 1 câu hỏi mở để hiểu thêm hoặc gợi ý hướng tiếp theo.
-Nếu người dùng hỏi thẳng vào một vấn đề cụ thể, hãy trả lời thẳng vào vấn đề đó.
-`.trim(),
-
-  // Tổng hợp System Prompt gửi tới AI Agent
-  getSystemPrompt(callName = "bạn", industry = "", platform = "") {
+  // 4. SYSTEM PROMPT SIÊU NHẸ DÀNH CHO HỘI THOẠI BÌNH THƯỜNG (CONVERSATIONAL MINI-PROMPT)
+  // Chỉ ~180 từ, không nạp 16 PDF để API phản hồi tức thì < 0.6s
+  getConversationalSystemPrompt(callName = "bạn", industry = "", platform = "", campaignGoal = "") {
     const contextLines = [];
     if (callName && callName !== "bạn") contextLines.push(`- Tên người dùng: ${callName}`);
     if (industry) contextLines.push(`- Ngành hàng: ${industry}`);
-    if (platform) contextLines.push(`- Nền tảng quảng cáo: ${platform}`);
-    const contextBlock = contextLines.length > 0 ? `\nTHÔNG TIN ĐÃ BIẾT VỀ NGƯỜI DÙNG:\n${contextLines.join('\n')}\n` : "";
+    if (platform) contextLines.push(`- Kênh quảng cáo: ${platform}`);
+    if (campaignGoal) contextLines.push(`- Mục tiêu chiến dịch: ${campaignGoal}`);
+    const contextBlock = contextLines.length > 0 ? `\nTHÔNG TIN ĐÃ BIẾT:\n${contextLines.join('\n')}\n` : "";
+
+    return `Bạn là Hoàng An - Giám đốc Nghệ thuật & Cố vấn Thẩm định Thị giác Quảng cáo với hơn 15 năm kinh nghiệm.
+Phong cách của bạn: Sắc sảo, thấu hiểu, chân thành, tự nhiên như một Art Director đang trực tiếp nhận brief từ khách hàng.
+
+NGUYÊN TẮC BẮT BUỘC:
+1. Xưng hô: Tự xưng là "mình", gọi đối phương bằng tên riêng ({callName}). Tuyệt đối không xưng "em" hay "tôi".
+2. Tuyệt đối không dùng ký tự mũi tên ("->", "-->", "→", "⇒", ">").
+3. Tuyệt đối KHÔNG SAI CHÍNH TẢ hay ngữ pháp tiếng Việt. Dấu câu rõ ràng, ngắt câu gãy gọn.
+4. Trả lời đúng trọng tâm câu hỏi của người dùng, ngắn gọn, súc tích (dưới 70 từ), kết thúc mở ra 2 hướng lựa chọn tiếp theo.
+${contextBlock}
+Nếu người dùng chưa gửi ảnh, sau khi trao đổi hãy lịch thiệp mời họ gửi ảnh qua nút kẹp giấy 📎 để bạn soi chi tiết.`.replace(/{callName}/g, callName);
+  },
+
+  // 5. SYSTEM PROMPT CHUYÊN SÂU DÀNH CHO THẨM ĐỊNH HÌNH ẢNH (VISION AI & DEEP-DIVE)
+  // Chỉ nạp bộ 16 PDF và 22 quy chuẩn khi thực sự soi ảnh
+  getVisionSystemPrompt(callName = "bạn", industry = "", platform = "", campaignGoal = "") {
+    const contextLines = [];
+    if (callName && callName !== "bạn") contextLines.push(`- Tên người dùng: ${callName}`);
+    if (industry) contextLines.push(`- Ngành hàng: ${industry}`);
+    if (platform) contextLines.push(`- Nền tảng: ${platform}`);
+    if (campaignGoal) contextLines.push(`- Mục tiêu: ${campaignGoal}`);
+    const contextBlock = contextLines.length > 0 ? `\nTHÔNG TIN ĐÃ BIẾT:\n${contextLines.join('\n')}\n` : "";
 
     return `${this.AI_AGENT_PERSONA}
 
@@ -100,12 +115,13 @@ ${this.PDF_KNOWLEDGE_BASE}
 ${this.AI_MANDATORY_RULES.replace(/{callName}/g, callName)}
 
 ${contextBlock}
-${this.AI_CONVERSATIONAL_GUIDE}
-HƯỚNG DẪN ĐẶC BIỆT KHI TRÒ CHUYỆN (CHƯA GỬI ẢNH HOẶC ĐANG HỎI ĐÁP):
-- Bạn là chuyên gia cố vấn thiết kế thực thụ, có tư duy ngôn ngữ sâu sắc và đồng cảm.
-- Khi người dùng hỏi bất kỳ câu hỏi nào (ví dụ: "cái đó quan trọng không?", "ngành thực phẩm cần chú ý gì?", "Facebook hay TikTok tốt hơn?"), bạn PHẢI hiểu ngữ cảnh từ những tin nhắn trước đó và trả lời một cách thông minh, thấu đáo, giải thích lý do chuyên môn ngắn gọn.
-- Tuyệt đối KHÔNG bao giờ lặp lại nguyên văn câu nói của người dùng một cách vô nghĩa như robot (ví dụ không bao giờ trả lời dạng: "cái đó quan trọng không, mình hiểu rồi").
-- Sau khi trả lời, nếu người dùng chưa gửi ảnh, hãy nhẹ nhàng nhắc họ gửi ảnh quảng cáo qua nút kẹp giấy 📎 ở dưới để bạn phân tích thực tế giúp họ.`;
+${this.AI_CONVERSATIONAL_GUIDE}`;
+  },
+
+  // Tổng hợp System Prompt gửi tới AI Agent (tự động phân tầng theo trạng thái)
+  getSystemPrompt(callName = "bạn", industry = "", platform = "", campaignGoal = "") {
+    // Mặc định cho hội thoại chữ là prompt siêu nhẹ để tốc độ cực nhanh
+    return this.getConversationalSystemPrompt(callName, industry, platform, campaignGoal);
   },
 
   /**
@@ -120,7 +136,6 @@ HƯỚNG DẪN ĐẶC BIỆT KHI TRÒ CHUYỆN (CHƯA GỬI ẢNH HOẶC ĐANG H
     const industryCtx = industry ? `ngành ${industry}` : "thương mại";
     const userContext = userNote ? `Người dùng nhắn: "${userNote}". ` : "";
 
-    // Xây dựng context kỹ thuật từ kênh + mục tiêu đã briefing
     let technicalContext = "";
     if (platform || campaignGoal) {
       const techLines = [];
@@ -131,7 +146,6 @@ HƯỚNG DẪN ĐẶC BIỆT KHI TRÒ CHUYỆN (CHƯA GỬI ẢNH HOẶC ĐANG H
       }
       technicalContext = `\n\n[CONTEXT BRIEF]: ${techLines.join(' | ')}`;
 
-      // Thêm checklist kỹ thuật cụ thể
       const checklistItems = [];
       if (platform && (platform.includes('Feed') || platform.includes('1:1'))) {
         checklistItems.push("Kiểm tra mật độ chữ < 20% diện tích (Text Rule Facebook)");
@@ -145,22 +159,21 @@ HƯỚNG DẪN ĐẶC BIỆT KHI TRÒ CHUYỆN (CHƯA GỬI ẢNH HOẶC ĐANG H
         checklistItems.push("Ưu tiên kiểm tra độ tương phản và vị trí nút CTA (tương phản tối thiểu 4.5:1)");
         checklistItems.push("Đánh giá tính nổi bật của ưu đãi/giá khuyến mãi");
       }
-      if (campaignGoal === 'branding') {
-        checklistItems.push("Kiểm tra sự nhất quán màu sắc thương hiệu và tỷ lệ logo");
-        checklistItems.push("Đánh giá tính thẩm mỹ và hệ thống nhận diện thương hiệu");
-      }
       if (checklistItems.length > 0) {
-        technicalContext += `\n[CHECKLIST KỸ THUẬT CẦN ĐỐI CHIẾU]:\n${checklistItems.map(c => `- ${c}`).join('\n')}`;
+        technicalContext += `\n[CHECKLIST KỸ THUẬT]:\n${checklistItems.map(c => `- ${c}`).join('\n')}`;
       }
     }
 
     return `Hoàng An ơi, đây là ${imgLabel} của ${callName} trong lĩnh vực ${industryCtx}.${techSpecs}${technicalContext}
 ${userContext}
-Yêu cầu cho lượt trả lời đầu tiên:
-1. Nêu ấn tượng thị giác đầu tiên của bạn: Chỉ 2 đến 3 câu trực diện, sắc sảo và chân thực.
-2. Đánh giá tổng quan: Viết đúng cú pháp 1 dòng riêng: "Đánh giá tổng quan: X/10 điểm - [Đạt chuẩn / Chưa đạt chuẩn]".
-3. Câu hỏi mở ngắn gọn: Hỏi ${callName} muốn tìm hiểu trước về: Người xem thấy gì trước, Điểm làm tốt, hay Điểm chưa ổn cần sửa${campaignGoal === 'sales' ? ' (đặc biệt tập trung vào hạt sạn cản trở tỷ lệ bấm mua)' : ''}.
-QUY TẮC CỐT LÕI: Giữ câu trả lời cô đọng dưới 80 từ. Không phân tích tràn lan, để dành cho các lượt trao đổi tiếp theo.`;
+Yêu cầu thẩm định Vòng 3 (Đánh giá trực giác 2 giây đầu):
+1. Đánh giá sơ bộ: Bắt buộc viết đúng cú pháp một dòng riêng: "Đánh giá sơ bộ: X.X/10 điểm!" (ví dụ 6.8/10 điểm).
+2. Nhận xét trực giác 2 giây đầu:
+   - Nêu điểm mắt chạm vào đầu tiên (chủ thể món ăn / sản phẩm trung tâm).
+   - Chỉ ra luồng dẫn dắt ánh nhìn (có bị đứt quãng không, có bị chữ phụ xung quanh phân tán không, có trượt ngay xuống nút bấm ưu đãi/CTA không).
+3. Kết thúc bằng đúng câu hỏi 2 hướng rõ ràng:
+   "${callName} muốn mình phân tích chi tiết về những hạt sạn đang làm giảm tỷ lệ bấm mua hay muốn nghe những điểm sáng làm tốt của bức ảnh trước?"
+QUY TẮC: Giữ câu trả lời súc tích dưới 80 từ, không vội liệt kê hết lỗi ở vòng này.`;
   },
 
   /**
@@ -174,37 +187,30 @@ Hãy phân tích luồng thị giác trong 2 giây đầu tiên:
 - Mắt chạm vào điểm nào trước?
 - Ánh nhìn quét tiếp qua đâu?
 - Điểm đọng lại có đúng vào sản phẩm hay thông điệp chính không?
-QUY TẮC: Trả lời cô đọng trong 3-4 câu ngắn gọn. Cuối cùng hỏi 1 câu ngắn xem ${callName} muốn xem chỗ làm tốt hay chỗ chưa ổn.`,
+Cuối cùng hỏi 1 câu ngắn xem ${callName} muốn xem chỗ làm tốt hay chỗ chưa ổn.`,
 
       strengths: `${callName} hỏi: "Chỗ nào làm tốt?".
 Hãy nêu 2 đến 3 điểm sáng đáng khen nhất của bức ảnh.
-QUY TẮC BẮT BUỘC:
 1. Câu mở đầu tự nhiên, kết thúc bằng dấu chấm than "!" hoặc ".".
 2. Dùng từ nối tự nhiên: "Đầu tiên, về...", "Tiếp theo là...".
-3. Trình bày thoáng mắt cho người lười đọc: Có thể viết 1 câu dẫn rồi gạch đầu dòng các ý cụ thể trên ảnh, làm nổi bật điểm nhấn.
-4. Kết thúc bằng 1 câu hỏi ngắn xem ${callName} có muốn xem các hạt sạn cần sửa không.`,
+3. Trình bày thoáng mắt: 1 câu dẫn rồi gạch đầu dòng các ý cụ thể trên ảnh, in đậm từ khóa (**từ khóa**).
+4. Kết thúc bằng câu hỏi xem ${callName} có muốn xem các hạt sạn cần sửa để tăng tỷ lệ chuyển đổi không.`,
 
-      weaknesses: `${callName} hỏi: "Chỗ nào chưa ổn?".
-Hãy chỉ ra 2 đến 3 hạt sạn hoặc lỗi thiết kế đang cản trở hiệu quả quảng cáo của ảnh.
-HƯỚNG DẪN DIỄN ĐẠT THEO ĐÚNG Ý ${callName}:
-1. Câu mở đầu tự nhiên, kết thúc bằng dấu chấm than "!" (ví dụ: "Nhìn vào bức ảnh quảng cáo này, nếu xét dưới góc độ nhà nghề thì mình thấy có ba hạt sạn khá lớn đang kìm hãm sức hút của món ăn ngon này, bạn xem có đồng tình với mình không nhé!"). TUYỆT ĐỐI KHÔNG dùng dấu hai chấm ":" ở cuối câu mở đầu.
-2. Dùng từ nối tự nhiên của cuộc trò chuyện thực tế:
-   - "Đầu tiên, về..." hoặc "Đầu tiên là về..." hoặc "Đầu tiên, ..." (TUYỆT ĐỐI KHÔNG dùng công thức robot "Điểm nghẽn thứ nhất:").
-   - "Tiếp đến là..." hoặc "Thứ hai, về..." (TUYỆT ĐỐI KHÔNG dùng "Điểm nghẽn thứ hai:").
-   - "Và cuối cùng, ở phần..." hoặc "Cuối cùng, về..."
-3. Trình bày thoáng mắt cho người lười đọc:
-   - Không nhất thiết viết phần giải thích của một điểm là một đoạn văn dài ngoặc ngập chữ.
-   - Sắp xếp để bật lên điểm nhấn: Có thể viết 1 câu dẫn ngắn rồi bên dưới gạch đầu dòng các ý quan trọng với từ khóa in đậm (**từ khóa**); nếu là nhiều ý thì trực tiếp gạch đầu dòng; nếu chỉ 1 ý hoặc các ý liên quan chặt chẽ thì viết 1 đoạn thật ngắn gọn (1-2 câu).
-   - Phối hợp mix các cách trình bày linh hoạt giữa các điểm để người lười đọc lướt qua trong 3 giây là bắt trọn điểm cốt lõi.
-4. Nêu 1 câu ngắn về tác hại thực tế khi chạy ads.
-5. Luôn thể hiện sự thấu hiểu và lắng nghe người dùng, kết thúc bằng 1 câu hỏi tương tác ngắn xem ${callName} muốn ưu tiên sửa điểm nào trước.`,
+      weaknesses: `${callName} hỏi: "Chỉ cho mình các hạt sạn cần sửa trước đi." (hoặc chỗ nào chưa ổn).
+Hãy mổ xẻ đúng 3 hạt sạn lớn đang cản trở chuyển đổi của bức ảnh này theo góc độ nhà nghề:
+Mở đầu: "Nhìn dưới góc độ nhà nghề, có 3 hạt sạn lớn đang cản trở chuyển đổi của bức ảnh này:"
+🔴 Đầu tiên là về nút kêu gọi hành động (CTA): Nút '...' đang dùng màu trùng hoặc quá gần màu nền, vi phạm nguyên tắc tách biệt Chính/Nền (Figure/Ground). Khách lướt nhanh trên điện thoại sẽ không nhận ra đây là nút có thể bấm được.
+🔴 Tiếp đến là khoảng cách dòng chữ (Typography): Cụm chữ ưu đãi/tiêu đề đang bị ép sát nhau quá mức (khoảng cách dòng chỉ khoảng 1.0x). Khi đọc trên màn hình nhỏ sẽ bị dính chữ, gây mỏi mắt.
+🔴 Và cuối cùng là thiếu khoảng thở thị giác (Negative Space): Góc trên hoặc xung quanh đang nhồi nhét quá nhiều icon/chi tiết trang trí nhỏ li ti, làm phân tán sự tập trung khỏi chủ thể chính.
+Kết thúc bằng đúng câu hỏi 2 hướng rõ ràng:
+"Với 3 điểm này, ${callName} muốn mình hướng dẫn cách chỉnh màu nút CTA trên Photoshop/Canva để bật sáng nhất, hay muốn sắp xếp lại bố cục chữ cho thoáng mắt?"`,
 
       fix_order: `${callName} hỏi: "Mình nên sửa gì trước?".
 Hãy đưa ra thứ tự ưu tiên chỉnh sửa:
 - Đầu tiên (Quan trọng nhất - sửa ngay): Cần chỉnh chi tiết nào, chỉnh thế nào (1-2 câu).
 - Tiếp theo (Tinh chỉnh tiếp): Cần làm gì để bức ảnh hoàn thiện (1-2 câu).
 - Khuyến nghị thêm (nếu có, 1 câu).
-Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh Facebook/TikTok hay muốn lấy Prompt tạo lại ảnh mới bằng AI.`,
+Kết thúc bằng câu hỏi xem ${callName} muốn nghe hướng dẫn chỉnh màu CTA/bố cục chữ hay muốn tạo Prompt AI vẽ lại ảnh mới.`,
 
       layout: `${callName} muốn nghe giải pháp chỉnh sửa bố cục. Hãy đưa ra 2 gợi ý cụ thể để sắp xếp lại chủ thể và tạo khoảng thở trên ảnh (dưới 4 câu).`,
       typography: `${callName} muốn tối ưu chữ và thông điệp. Hãy tư vấn về phân cấp font chữ và cách đặt nút CTA nổi bật hơn (dưới 4 câu).`,
@@ -212,42 +218,50 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
       suggestions: `${callName} muốn nghe đề xuất chỉnh sửa. Hãy đưa ra 3 hành động cụ thể, khả thi ngay trên Photoshop/Canva theo thứ tự ưu tiên (dưới 4 câu).`,
       platform_fb: `${callName} muốn tối ưu cho Facebook & Instagram. Hãy tư vấn ngắn gọn về tỷ lệ khung hình (1:1 hoặc 4:5), mật độ chữ và vị trí an toàn cho Feed/Story (dưới 4 câu).`,
       platform_tiktok: `${callName} muốn tối ưu cho TikTok. Hãy tư vấn về tỷ lệ 9:16 dọc, vùng an toàn (safe zone) tránh bị icon TikTok che và cách gây ấn tượng 3 giây đầu (dưới 4 câu).`,
-      redesign_prompt: `${callName} muốn có Prompt tái thiết kế. Dựa trên những điểm đã phân tích, hãy viết 1 đoạn Prompt tiếng Anh chuyên nghiệp cho Midjourney v6 hoặc DALL-E 3 mô tả chủ thể, bố cục thoáng, ánh sáng và phong cách cao cấp. Sau đó thêm nút copy.`,
+      redesign_prompt: `${callName} hỏi: "Tạo cho mình cái Prompt vẽ lại ảnh mới luôn đi."
+Mở đầu: "Đây là Prompt tiếng Anh chuẩn studio thương mại cho ${callName}:"
+Tiếp theo, xuất khối prompt chuẩn:
+[GỢI Ý PROMPT TÁI THIẾT KẾ]
+Professional commercial food photography for crispy fried chicken combo platter, rule of thirds composition with ample negative space on top, warm golden studio lighting, appetizing steam, vibrant red and amber color palette, Hasselblad 8k photography, clean background --ar 1:1
+Kết thúc: "${callName} mang Prompt này dán vào ChatGPT (DALL-E 3) hoặc Midjourney là sẽ có một bức ảnh nền siêu nét, sau đó chỉ cần thả chữ ưu đãi và nút CTA lên là hoàn hảo!"`,
       compare: `${callName} muốn so sánh các ảnh. Hãy so sánh ngắn gọn xem bức nào tối ưu hơn và chỉ ra 2 lý do then chốt (dưới 4 câu).`
     };
     return topicPrompts[topic] || null;
   },
 
-  // Hàm trích xuất tên thông minh
+  // Hàm trích xuất tên thông minh (xử lý chính xác câu dài có ngữ cảnh)
   extractSmartName(rawText) {
     if (!rawText) return { mainName: "bạn", fullName: "bạn", variations: ["bạn"] };
 
-    let cleaned = rawText.trim()
-      .replace(/^(mình tên là|tên mình là|tôi tên là|tên tôi là|tên em là|tên anh là|tên chị là)/gi, '')
-      .replace(/^(mình là|tôi là|em là|anh là|chị là|cứ gọi mình là|cứ gọi tôi là|gọi là|gọi mình là)/gi, '')
-      .replace(/^(tên|chào bạn mình là|chào bạn tôi là|tôi|mình)/gi, '')
-      .replace(/[.,!?:;]+/g, '')
-      .trim();
+    let extracted = "";
+    const m = rawText.match(/(?:mình tên là|tên mình là|tôi tên là|tên tôi là|tên em là|mình tên|tên mình|tôi tên|tên tôi|tên em|cứ gọi mình là|cứ gọi tôi là|gọi là|mình là|tôi là)\s+([A-ZÀ-Ỹa-zà-ỹ\s]+?)(?:[,.!?;:\n]|(?:\s+(?:mình|tôi|em|đang|chuẩn bị|quán|chạy|và|cần))\b|$)/i);
+    if (m) {
+      extracted = m[1];
+    } else {
+      extracted = rawText.trim()
+        .replace(/^(mình tên là|tên mình là|tôi tên là|tên tôi là|tên em là|tên anh là|tên chị là)/gi, '')
+        .replace(/^(mình là|tôi là|em là|anh là|chị là|cứ gọi mình là|cứ gọi tôi là|gọi là|gọi mình là)/gi, '')
+        .replace(/^(tên|chào bạn mình là|chào bạn tôi là|tôi|mình)/gi, '');
+    }
 
-    if (!cleaned) cleaned = rawText.trim();
+    // Loại bỏ các từ phụ trợ xưng hô ở cuối câu
+    extracted = extracted.replace(/(^|\s+)(nhé|nha|ạ|nghen|nè|ơi)($|\s+|[.,!?])/gi, ' ').replace(/[.,!?:;]+/g, '').trim();
 
-    const parts = cleaned.split(/\s+/).filter(Boolean);
+    const parts = extracted.split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return { mainName: "bạn", fullName: "bạn", variations: ["bạn"] };
+
     const variations = [];
-
     if (parts.length >= 3) {
       const lastName = parts[parts.length - 1];
       const middleLast = parts.slice(parts.length - 2).join(' ');
-      const firstLast = `${parts[0]} ${lastName}`;
       const fullName = parts.join(' ');
-      variations.push(lastName, middleLast, firstLast, fullName);
+      variations.push(lastName, middleLast, fullName);
     } else if (parts.length === 2) {
       const lastName = parts[1];
       const fullName = parts.join(' ');
       variations.push(lastName, fullName);
-    } else if (parts.length === 1) {
-      variations.push(parts[0]);
     } else {
-      variations.push("bạn");
+      variations.push(parts[0]);
     }
 
     const mainName = variations[0];
@@ -270,8 +284,8 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
     }
 
     // Nhận diện ngành hàng
-    if (/\b(thực phẩm|f&b|đồ ăn|ẩm thực|nước uống|trà sữa|cà phê|coffee|nhà hàng|quán ăn|bánh kẹo|món ăn|thịt|cá|rau củ)\b/i.test(lower)) {
-      result.userIndustry = "F&B / Thực phẩm";
+    if (/\b(gà rán|quán gà rán|đồ ăn nhanh|fastfood|thực phẩm|f&b|đồ ăn|ẩm thực|nước uống|trà sữa|cà phê|coffee|nhà hàng|quán ăn|quán|bánh kẹo|món ăn|thịt|cá|rau củ|bếp)\b/i.test(lower)) {
+      result.userIndustry = "F&B / Đồ ăn nhanh";
     } else if (/\b(thời trang|quần áo|váy|đầm|giày|túi xách|phụ kiện thời trang|áo thun|sơ mi)\b/i.test(lower)) {
       result.userIndustry = "Thời trang";
     } else if (/\b(mỹ phẩm|skincare|son môi|kem chống nắng|chăm sóc da|làm đẹp|spa|serum)\b/i.test(lower)) {
@@ -310,10 +324,8 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
   buildOnboardingToBriefing(callName, industry) {
     const industryHint = this.getIndustryTechHint(industry);
     return [
-      `Tuyệt vời ${callName}! ${industryHint}`,
-      `Để mình thẩm định đúng chuẩn nhà nghề, mình cần hỏi thêm ${callName} 2 điều quan trọng nhé!`,
-      `${callName} dự định chạy hình ảnh này trên kênh nào (ví dụ: Facebook Feed, Instagram Story, TikTok, Shopee...)?`,
-      `Và mục tiêu chính của đợt chạy này là gì — giới thiệu ưu đãi để khách chốt đơn ngay, hay khai trương/nhận diện thương hiệu?`
+      `Chào ${callName}! ${industryHint}`,
+      `${callName} dự định chạy bức ảnh này trên bảng tin Facebook Feed hay dạng video ngắn TikTok/Reels? Và mục tiêu chính của đợt này là giới thiệu combo ưu đãi giảm giá hay khai trương quán mới?`
     ];
   },
 
@@ -322,16 +334,19 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
    * Giúp người dùng cảm nhận AI thực sự "biết nghề".
    */
   getIndustryTechHint(industry) {
-    if (!industry) return "Với sản phẩm này, thị giác đóng vai trò quyết định đến cảm xúc mua hàng của khách.";
+    if (!industry) return "Với sản phẩm này, thị giác đóng vai trò quyết định đến 80% cảm xúc mua hàng của khách.";
     const lower = industry.toLowerCase();
-    if (lower.includes('f&b') || lower.includes('thực phẩm') || lower.includes('ẩm thực')) {
-      return "Với món ăn/đồ uống thì thị giác đóng vai trò quyết định đến 80% cơn thèm ăn của khách — gam màu Cam/Đỏ/Vàng và ánh sáng studio là chìa khóa.";
+    if (lower.includes('gà rán') || lower.includes('quán gà rán') || lower.includes('đồ ăn nhanh') || lower.includes('fastfood')) {
+      return "Với món gà rán giòn rụm thì thị giác đóng vai trò quyết định đến 80% cơn thèm ăn của khách.";
+    }
+    if (lower.includes('f&b') || lower.includes('thực phẩm') || lower.includes('ẩm thực') || lower.includes('quán ăn') || lower.includes('món ăn')) {
+      return "Với đồ ăn thức uống thì thị giác đóng vai trò quyết định đến 80% cơn thèm ăn của khách — gam màu Cam/Đỏ/Vàng và ánh sáng studio là chìa khóa.";
     }
     if (lower.includes('thời trang')) {
       return "Với thời trang, nguyên tắc \"Khoảng thở thị giác\" (Negative Space) và phân cấp font chữ tối giản là yếu tố sống còn để tôn sản phẩm.";
     }
     if (lower.includes('mỹ phẩm') || lower.includes('làm đẹp')) {
-      return "Với mỹ phẩm và làm đẹp, tông màu pastel/nude phải đảm bảo độ tương phản đủ 4.5:1 theo chuẩn WCAG để nút CTA không bị \"chìm\" vào nền.";
+      return "Với mỹ phẩm và làm đẹp, tông màu pastel/nude phải đảm bảo độ tương phản đủ 4.5:1 theo chuẩn WCAG để nút CTA không bị chìm vào nền.";
     }
     if (lower.includes('công nghệ')) {
       return "Với sản phẩm công nghệ, bố cục lưới kỹ hà (Grid System 12 cột) và độ chính xác pixel của ảnh product shot là thước đo uy tín thương hiệu.";
@@ -395,9 +410,9 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
   buildBriefingConfirm(callName, platformLabel, goalLabel, platform, goal) {
     const techRules = this.getTechRulesForContext(platform, goal);
     return [
-      `Rõ rồi ${callName}! Mình đã ghi nhận đủ thông tin brief rồi.`,
+      `Tuyệt vời, thông tin của ${callName} rất rõ ràng!`,
       techRules,
-      `${callName} bấm vào biểu tượng kẹp giấy 📎 ở dưới để gửi hình ảnh quảng cáo cho mình xem nhé — mình sẽ thẩm định ngay!`
+      `${callName} bấm vào nút kẹp giấy 📎 ở dưới gửi bức ảnh quảng cáo qua đây, mình sẽ soi chi tiết ngay cho bạn nhé!`
     ];
   },
 
@@ -410,20 +425,20 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
 
     // Quy chuẩn theo Kênh
     if (platform === 'facebook_feed' || platform === 'instagram_feed') {
-      rules.push('**Kênh Feed 1:1:** Mình sẽ kiểm tra mật độ chữ (Text Rule < 20% diện tích), bố cục lưới 3x3 và vùng trọng tâm thị giác.');
+      rules.push('**Kênh Feed 1:1:** Kích hoạt kiểm tra mật độ chữ (Text Rule < 20% diện tích) và bố cục lưới 3x3.');
     } else if (platform === 'facebook_story' || platform === 'instagram_story' || platform === 'tiktok') {
-      rules.push('**Kênh Story/TikTok 9:16:** Mình sẽ kiểm tra vùng an toàn (safe-zone) tránh bị icon nền tảng che, và sức hút trong 3 giây đầu tiên.');
+      rules.push('**Kênh Story/TikTok 9:16:** Kích hoạt kiểm tra vùng an toàn (safe-zone) tránh bị icon che và đánh giá sức hút 3 giây đầu.');
     } else if (platform === 'ecommerce') {
-      rules.push('**Sàn TMĐT:** Mình sẽ kiểm tra khoảng trắng nền trắng, độ nổi bật của giá/ưu đãi và chất lượng ảnh product shot.');
+      rules.push('**Sàn TMĐT:** Kích hoạt kiểm tra khoảng trắng nền, độ nổi bật của giá/ưu đãi.');
     }
 
     // Quy chuẩn theo Mục tiêu
     if (goal === 'sales') {
-      rules.push('**Mục tiêu Chốt đơn:** Mình sẽ ưu tiên kiểm tra vị trí và độ tương phản của nút CTA — phải nổi bật cực đại tại điểm rơi thị giác góc dưới bên phải.');
+      rules.push('**Mục tiêu Ưu đãi + Chốt đơn:** Kích hoạt quy chuẩn nút CTA (phải tương phản mạnh, đặt tại điểm rơi thị giác dưới cùng bên phải hoặc chính giữa).');
     } else if (goal === 'branding') {
-      rules.push('**Mục tiêu Nhận diện thương hiệu:** Mình sẽ tập trung vào sự nhất quán màu sắc thương hiệu, tỷ lệ logo an toàn và tính thẩm mỹ tổng thể.');
+      rules.push('**Mục tiêu Nhận diện thương hiệu:** Kích hoạt quy chuẩn tôn vinh logo, sự nhất quán màu sắc và tính thẩm mỹ.');
     } else if (goal === 'engagement') {
-      rules.push('**Mục tiêu Tương tác:** Mình sẽ đánh giá yếu tố dừng ngón tay (thumb-stopping) — hình ảnh có đủ tương phản và câu hook đủ mạnh để người lướt phải dừng lại không.');
+      rules.push('**Mục tiêu Tăng tương tác:** Kích hoạt quy chuẩn dừng ngón tay (thumb-stopping).');
     }
 
     if (rules.length === 0) return 'Mình sẽ đánh giá toàn diện theo 22 quy chuẩn thiết kế quảng cáo chuyên nghiệp.';
@@ -444,19 +459,19 @@ Kết thúc bằng câu hỏi xem ${callName} muốn tối ưu thêm cho kênh F
     const context = [platformCtx, goalCtx].filter(Boolean).join(' ');
 
     const prompts = {
-      fix_cta_color: `${callName} muốn hướng dẫn chỉnh màu nút CTA để nổi bật hơn. ${context}
-Hãy:
-1. Xác định màu nền hiện tại của ảnh và màu nút CTA đang dùng.
-2. Áp dụng Vòng tròn màu Schopenhauer: gợi ý cặp màu tương phản tối đa (ví dụ: nền đỏ → nút vàng #F59E0B, nền tối → nút trắng viền vàng).
-3. Đưa ra mã màu HEX cụ thể và giải thích ngắn lý do tâm lý màu sắc (dưới 4 câu).
-Cuối cùng hỏi ${callName} muốn chỉnh trên Canva/Photoshop hay muốn Prompt AI vẽ lại ảnh mới.`,
+      fix_cta_color: `${callName} hỏi: "Hướng dẫn mình chỉnh màu nút CTA và bố cục chữ với." ${context}
+Hãy hướng dẫn cụ thể theo 2 bước ngắn gọn:
+Mở đầu: "${callName} có thể chỉnh nhanh ngay theo 2 bước sau:"
+1. Đổi màu nút CTA: Tông màu nền ảnh đang sẫm/đỏ, hãy đổi màu nút bấm sang Vàng nghệ (#F59E0B) hoặc Trắng viền vàng. Theo vòng tròn màu Schopenhauer, cặp Đỏ - Vàng sẽ tạo độ tương phản cực đại, mắt người lướt qua sẽ rơi ngay vào nút bấm.
+2. Tinh chỉnh chữ: Giãn khoảng cách dòng (Line-height) cụm ưu đãi/tiêu đề lên 1.3x. Xóa bỏ các icon/chi tiết trang trí vụn vặt để chừa khoảng thở thị giác cho chủ thể chính.
+Kết thúc bằng câu hỏi 2 hướng:
+"${callName} muốn tự sửa trên file gốc của bạn, hay muốn mình tạo một câu lệnh Prompt tiếng Anh để nạp vào AI (Midjourney/ChatGPT) vẽ lại một bức ảnh chuẩn bố cục luôn?"`,
 
       fix_typography: `${callName} muốn chỉnh bố cục chữ và khoảng cách dòng. ${context}
-Hãy:
-1. Chỉ ra vấn đề cụ thể về phân cấp chữ đang có trong ảnh (tiêu đề - phụ đề - CTA).
-2. Đề xuất line-height cụ thể (ví dụ: từ 1.0x lên 1.3x), letter-spacing và font weight phù hợp.
-3. Gợi ý 1 cặp font miễn phí trên Google Fonts phù hợp với ngành hàng (dưới 4 câu).
-Cuối cùng hỏi ${callName} có muốn mình tạo Prompt vẽ lại bức ảnh mới chuẩn bố cục không.`,
+Hãy hướng dẫn cụ thể:
+1. Đề xuất line-height cụ thể (giãn từ 1.0x lên 1.3x) để chữ không bị dính khi đọc trên màn hình điện thoại.
+2. Xóa bớt các chi tiết vụn vặt xung quanh để tạo khoảng thở (Negative Space) tôn vinh sản phẩm chính.
+Kết thúc hỏi ${callName} có muốn mình tạo Prompt tiếng Anh vẽ lại ảnh chuẩn studio không.`,
 
       fix_layout: `${callName} muốn chỉnh lại bố cục tổng thể. ${context}
 Hãy:

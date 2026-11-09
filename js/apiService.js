@@ -12,9 +12,19 @@
  */
 
 const ApiService = {
+  // Ghi nhớ model hoạt động tốt nhất để gọi trực tiếp lần sau (tránh fallback lặp lại)
+  activeGeminiModel: null,
+
+  getPrioritizedGeminiModels() {
+    if (this.activeGeminiModel) {
+      return [this.activeGeminiModel, ...AdvConfig.GEMINI_MODELS.filter(m => m !== this.activeGeminiModel)];
+    }
+    return AdvConfig.GEMINI_MODELS;
+  },
+
   // 1. GỌI GEMINI VISION API ĐỂ THẨM ĐỊNH HÌNH ẢNH (VLM ENGINE)
   async callGeminiVisionApi(apiKey, base64Data, mimeType, userText, systemPrompt) {
-    const models = AdvConfig.GEMINI_MODELS;
+    const models = this.getPrioritizedGeminiModels();
     let lastErr = null;
 
     for (const modelName of models) {
@@ -41,7 +51,10 @@ const ApiService = {
 
         const json = await resp.json();
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+        if (text) {
+          this.activeGeminiModel = modelName;
+          return text;
+        }
       } catch (e) {
         lastErr = e;
       }
@@ -51,7 +64,7 @@ const ApiService = {
 
   // 2. GỌI GEMINI MULTI-TURN CHAT (HỘI THOẠI ĐA LƯỢT)
   async callGeminiMultiTurnChat(apiKey, newText, systemPrompt, conversationHistory = [], activeImageData = null) {
-    const models = AdvConfig.GEMINI_MODELS;
+    const models = this.getPrioritizedGeminiModels();
     let lastErr = null;
 
     const contents = [];
@@ -97,7 +110,10 @@ const ApiService = {
 
         const json = await resp.json();
         const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+        if (text) {
+          this.activeGeminiModel = modelName;
+          return text;
+        }
       } catch (e) {
         lastErr = e;
       }

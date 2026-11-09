@@ -256,11 +256,26 @@ const AppController = {
     const chatInput = UIController.elements.chatInput;
     if (!chatInput) return;
 
-    // Briefing quick actions: chọn kênh phân phối
+    // Industry quick actions (Vòng 1 Onboarding)
+    const industryMap = {
+      'industry_fnb':     'Mình đang chuẩn bị chạy ads cho quán gà rán',
+      'industry_fashion': 'Mình đang chuẩn bị chạy ads thời trang',
+      'industry_beauty':  'Mình đang chuẩn bị chạy ads mỹ phẩm làm đẹp',
+      'industry_tech':    'Mình đang chuẩn bị chạy ads sản phẩm công nghệ'
+    };
+    if (industryMap[actionKey]) {
+      chatInput.value = industryMap[actionKey];
+      this.handleChatSubmit();
+      return;
+    }
+
+    // Briefing quick actions: chọn kênh phân phối & mục tiêu
     const briefingPlatformMap = {
+      'briefing_fb_sales':   'Mình chạy Facebook Feed, ảnh vuông, muốn đẩy mạnh ưu đãi combo giảm 30% để khách bấm đặt hàng luôn.',
+      'briefing_fb_launch':  'Mình chạy Facebook Feed 1:1, mục tiêu khai trương quán mới',
       'briefing_fb_feed':    'Mình chạy Facebook Feed, ảnh vuông 1:1',
       'briefing_ig_story':   'Mình chạy Instagram Story 9:16',
-      'briefing_tiktok':     'Mình chạy TikTok 9:16',
+      'briefing_tiktok':     'Mình chạy TikTok 9:16 dạng video ngắn ưu đãi',
       'briefing_ecommerce':  'Mình chạy trên Shopee/Lazada'
     };
     if (briefingPlatformMap[actionKey]) {
@@ -322,7 +337,10 @@ const AppController = {
     if (!apiKey) return;
 
     const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
-    const systemPrompt = PersonaPrompt.getSystemPrompt(callName);
+    // Dùng Vision System Prompt có 16 PDF để soi sâu chi tiết ảnh
+    const systemPrompt = PersonaPrompt.getVisionSystemPrompt(
+      callName, this.state.userIndustry, this.state.userPlatform, this.state.campaignGoal
+    );
     const followUpText = PersonaPrompt.buildFollowUpPrompt(callName, topic);
     if (!followUpText) return;
 
@@ -330,11 +348,11 @@ const AppController = {
     const topicLabels = {
       first_impression: 'Người xem thấy gì trước tiên?',
       strengths: 'Chỗ nào làm tốt?',
-      weaknesses: 'Chỗ nào chưa ổn?',
+      weaknesses: 'Chỉ cho mình các hạt sạn cần sửa trước đi',
       fix_order: 'Mình nên sửa gì trước?',
       platform_fb: 'Tối ưu cho Facebook & Instagram',
       platform_tiktok: 'Tối ưu cho TikTok',
-      redesign_prompt: 'Tạo Prompt tái thiết kế',
+      redesign_prompt: 'Tạo cho mình cái Prompt vẽ lại ảnh mới luôn đi',
       compare: 'So sánh ảnh nào tốt hơn'
     };
     UIController.appendUserMessage(topicLabels[topic] || topic, []);
@@ -363,61 +381,42 @@ const AppController = {
     await UIController.streamLines(lines, this.getNextActionsForTopic(topic));
   },
 
-  // Sinh quick actions tiếp theo dựa trên topic vừa trả lời - theo đoạn hội thoại mẫu
+  // Sinh quick actions tiếp theo dựa trên topic vừa trả lời - chuẩn 6 Vòng Art Director
   getNextActionsForTopic(topic) {
-    // Flow: overview → first_impression → strengths → weaknesses → fix_order → platform → redesign
     const map = {
       first_impression: [
-        { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' },
-        { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
+        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+        { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
       ],
       strengths: [
-        { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' },
-        { text: '🎯 Mình nên sửa gì trước?', action: 'fix_order' }
+        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' }
       ],
       weaknesses: [
-        { text: '🎯 Mình nên sửa gì trước?', action: 'fix_order' },
-        { text: '💡 Đề xuất cách sửa cụ thể', action: 'suggestions' },
-        { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
+        { text: '🎨 Chỉnh màu nút CTA bật sáng', action: 'fix_cta_color' },
+        { text: '✍️ Sắp xếp lại bố cục chữ', action: 'fix_typography' }
       ],
       fix_order: [
-        { text: '🎨 Hướng dẫn chỉnh màu nút CTA', action: 'fix_cta_color' },
+        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
         { text: '✍️ Chỉnh bố cục chữ & khoảng cách', action: 'fix_typography' },
         { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' }
       ],
       platform_fb: [
-        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+        { text: '🤖 Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+        { text: '🎵 Tối ưu cho TikTok', action: 'platform_tiktok' }
       ],
       platform_tiktok: [
-        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: 'Tối ưu cho Facebook', action: 'platform_fb' }
+        { text: '🤖 Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
+        { text: '📱 Tối ưu cho Facebook', action: 'platform_fb' }
       ],
       redesign_prompt: [
-        { text: 'Tối ưu cho Facebook', action: 'platform_fb' },
-        { text: 'Tối ưu cho TikTok', action: 'platform_tiktok' }
+        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
+        { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' }
       ],
       compare: [
         { text: 'Người xem thấy gì trước?', action: 'first_impression' },
         { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' },
         { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
-      ],
-      // Aliases cho các topic cũ
-      layout: [
-        { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' },
-        { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
-      ],
-      typography: [
-        { text: 'Chỗ nào làm tốt?', action: 'strengths' },
-        { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
-      ],
-      pros_cons: [
-        { text: 'Mình nên sửa gì trước?', action: 'fix_order' },
-        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' }
-      ],
-      suggestions: [
-        { text: 'Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: 'Tối ưu cho Facebook', action: 'platform_fb' }
       ]
     };
     return map[topic] || [];
@@ -554,9 +553,8 @@ const AppController = {
     const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
 
     // =========================================================================
-    // VÒNG 1 → VÒNG 2: Sau khi biết tên + ngành hàng → chuyển sang Briefing
+    // VÒNG 1: ONBOARDING NHANH (ZERO-LATENCY TỨC THÌ)
     // =========================================================================
-    // Điều kiện: chưa có thông tin kênh, chưa có ảnh, và tin nhắn không phải câu hỏi
     if (
       this.state.conversationStage === 'idle' || this.state.conversationStage === 'onboarding'
     ) {
@@ -565,19 +563,32 @@ const AppController = {
       const hasPlatform = !!this.state.userPlatform;
       const hasCampaignGoal = !!this.state.campaignGoal;
 
-      // Nếu vừa nhận được tên hoặc ngành → chuyển sang hỏi briefing (kênh + mục tiêu)
+      // 1A. Người dùng chỉ mới nhập Tên -> Phản hồi tức thì trong 0.05s chào Tên và hỏi ngành
+      if (hasName && !hasIndustry && !hasPlatform && !hasCampaignGoal && sentImages.length === 0) {
+        this.state.conversationStage = 'onboarding';
+        const instantGreeting = [
+          `Chào ${callName}! Rất vui được đồng hành cùng bạn.`,
+          `Hôm nay ${callName} cần mình đồng hành tối ưu hình ảnh cho sản phẩm hoặc chiến dịch nào vậy?`
+        ];
+        await UIController.streamLines(instantGreeting, [
+          { text: '🍗 Quán ăn / F&B gà rán', action: 'industry_fnb' },
+          { text: '👗 Thời trang / Phụ kiện', action: 'industry_fashion' },
+          { text: '💄 Mỹ phẩm / Làm đẹp', action: 'industry_beauty' },
+          { text: '📱 Công nghệ / Điện tử', action: 'industry_tech' }
+        ]);
+        this.updateSystemStatus();
+        return;
+      }
+
+      // 1B. Đã có cả Tên + Ngành hàng -> Chuyển ngay sang Vòng 2 Briefing
       if (hasName && hasIndustry && !hasPlatform && !hasCampaignGoal && sentImages.length === 0) {
         this.state.conversationStage = 'briefing';
-        UIController.showTypingIndicator("Đang chuẩn bị câu hỏi briefing...");
-        await UIController.delay(800);
-        UIController.hideTypingIndicator();
-
         const briefingLines = PersonaPrompt.buildOnboardingToBriefing(callName, this.state.userIndustry);
         await UIController.streamLines(briefingLines, [
-          { text: '📱 Facebook Feed 1:1', action: 'briefing_fb_feed' },
-          { text: '📱 Instagram Story 9:16', action: 'briefing_ig_story' },
-          { text: '🎵 TikTok 9:16', action: 'briefing_tiktok' },
-          { text: '🛒 Shopee/Lazada', action: 'briefing_ecommerce' }
+          { text: '📱 Facebook Feed 1:1 - Ưu đãi giảm 30%', action: 'briefing_fb_sales' },
+          { text: '📱 Facebook Feed 1:1 - Khai trương quán', action: 'briefing_fb_launch' },
+          { text: '🎵 TikTok / Reels 9:16', action: 'briefing_tiktok' },
+          { text: '🛒 Sàn Shopee / Lazada', action: 'briefing_ecommerce' }
         ]);
         this.updateSystemStatus();
         return;
@@ -609,10 +620,6 @@ const AppController = {
 
       if (finalPlatform || finalGoal) {
         this.state.conversationStage = 'awaiting_image';
-        UIController.showTypingIndicator("Đang tổng hợp thông tin brief...");
-        await UIController.delay(900);
-        UIController.hideTypingIndicator();
-
         const confirmLines = PersonaPrompt.buildBriefingConfirm(
           callName, finalPlatformLabel, finalGoalLabel, finalPlatform, finalGoal
         );
@@ -624,7 +631,11 @@ const AppController = {
       }
       // Nếu không parse được kênh/mục tiêu → để AI trả lời tự nhiên (fall through)
     }
-    const systemPrompt = PersonaPrompt.getSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform);
+
+    // Chọn Prompt phân tầng: có ảnh thì dùng Vision Prompt (kèm 16 PDF), chưa ảnh thì dùng Mini Prompt siêu nhẹ
+    const systemPrompt = (sentImages.length > 0 || this.state.activeImageData)
+      ? PersonaPrompt.getVisionSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform, this.state.campaignGoal)
+      : PersonaPrompt.getConversationalSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform, this.state.campaignGoal);
 
     // BƯỚC 3: NGƯỜI DÙNG GỬI ẢNH -> THẨM ĐỊNH TỪNG ẢNH MỘT
     if (sentImages.length > 0) {
@@ -714,36 +725,19 @@ const AppController = {
 
         const isLast = (i === sentImages.length - 1);
 
-        // Quick actions sau overview: thay đổi động theo mục tiêu chiến dịch (Bước 5)
+        // Quick actions sau overview: Chuẩn kịch bản Art Director Vòng 3
         let quickActions = null;
         if (isLast) {
           if (sentImages.length > 1) {
-            // Nhiều ảnh: ưu tiên so sánh trước
             quickActions = [
               { text: '⚖️ So sánh ảnh nào tốt hơn', action: 'compare' },
-              { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' },
-              { text: '✨ Chỗ nào làm tốt?', action: 'strengths' }
-            ];
-          } else if (this.state.campaignGoal === 'sales') {
-            // Mục tiêu bán hàng: ưu tiên phân tích hạt sạn cản chuyển đổi
-            quickActions = [
               { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-              { text: '✨ Điểm sáng của ảnh', action: 'strengths' },
-              { text: '👁️ Mắt người xem dừng ở đâu?', action: 'first_impression' }
-            ];
-          } else if (this.state.campaignGoal === 'branding') {
-            // Mục tiêu brand: ưu tiên điểm mạnh và nhận diện
-            quickActions = [
-              { text: '✨ Điểm sáng nhận diện thương hiệu', action: 'strengths' },
-              { text: '⚠️ Điểm chưa nhất quán', action: 'weaknesses' },
-              { text: '👁️ Ấn tượng thị giác đầu tiên', action: 'first_impression' }
+              { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
             ];
           } else {
-            // Default: flow chuẩn
             quickActions = [
-              { text: '👁️ Người xem thấy gì trước?', action: 'first_impression' },
-              { text: '✨ Chỗ nào làm tốt?', action: 'strengths' },
-              { text: '⚠️ Chỗ nào chưa ổn?', action: 'weaknesses' }
+              { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+              { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
             ];
           }
         }

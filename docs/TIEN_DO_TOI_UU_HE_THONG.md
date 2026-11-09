@@ -35,4 +35,4 @@
 | **M3.5** | Hoàn thiện Vòng 5: Actionable Fixes | ✅ Hoàn thành | Hướng dẫn Schopenhauer Vàng nghệ #F59E0B, giãn line-height 1.3x |
 | **M3.6** | Hoàn thiện Vòng 6: Gen AI Prompt | ✅ Hoàn thành | Sinh thẻ đen viền xanh Prompt Studio thương mại 8K kèm nút Copy |
 | **M4.1** | Loại bỏ delay nhân tạo | ✅ Hoàn thành | Bỏ các hàm delay 800-900ms, stream chữ 8ms mượt mà |
-| **M5.1** | Đo lường Benchmark & Đồng bộ | ⏳ Đang làm | Đo lường latency giảm từ 8s xuống 1.2s; chuẩn bị đồng bộ GitHub |
+| **M5.1** | Đo lường Benchmark & Đồng bộ | ✅ Hoàn thành | Độ trễ giảm từ 8s xuống ~1.2s; đã đồng bộ GitHub commit f3f811d |

@@ -170,6 +170,8 @@ const SidebarController = (() => {
     }
   }
 
+  let _tokenClient = null;
+
   // Giải mã JWT Token từ Google Identity Services
   function parseJwt(token) {
     try {
@@ -185,9 +187,9 @@ const SidebarController = (() => {
     }
   }
 
-  // Khởi tạo Google Identity Services (GIS) chính thức
+  // Khởi tạo Google Identity Services (GIS) & OAuth 2.0 Token Client
   function initGoogleIdentity() {
-    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+    if (typeof google === 'undefined' || !google.accounts) {
       // Đợi Google SDK tải xong
       setTimeout(initGoogleIdentity, 300);
       return;
@@ -197,74 +199,110 @@ const SidebarController = (() => {
       ? AdvConfig.getGoogleClientId()
       : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
-    try {
-      google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response) => {
-          if (response && response.credential) {
-            const payload = parseJwt(response.credential);
-            completeGoogleSignIn({
-              id: payload.sub || ('google-' + Date.now()),
-              name: payload.name || payload.given_name || 'Người dùng Google',
-              email: payload.email || 'user@gmail.com',
-              picture: payload.picture || null
-            });
+    // 1. Khởi tạo Token Client OAuth 2.0 (Dùng cho nút bấm chủ động - Luôn bật Popup chọn tài khoản!)
+    if (google.accounts.oauth2) {
+      try {
+        _tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              try {
+                // Lấy thông tin người dùng từ Google UserInfo API
+                const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${tokenResponse.access_token}` }
+                });
+                const userInfo = await resp.json();
+                completeGoogleSignIn({
+                  id: userInfo.sub || ('google-' + Date.now()),
+                  name: userInfo.name || userInfo.given_name || 'Người dùng Google',
+                  email: userInfo.email || 'user@gmail.com',
+                  picture: userInfo.picture || null,
+                  provider: 'google'
+                });
+              } catch (err) {
+                console.error('[Google OAuth] Lỗi fetch userinfo:', err);
+              }
+            }
           }
-        },
-        auto_select: false,
-        cancel_on_tap_outside: true
-      });
+        });
+      } catch (err) {
+        console.warn('[Google OAuth Token Client]', err);
+      }
+    }
 
-      // Render nút đăng nhập Google chính thức vào container nếu có
-      const slot = document.getElementById('google-official-btn-slot');
-      if (slot) {
-        slot.innerHTML = '';
-        google.accounts.id.renderButton(slot, {
-          theme: 'outline',
-          size: 'large',
-          type: 'standard',
-          shape: 'rectangular',
-          text: 'signin_with',
-          logo_alignment: 'left',
-          width: 230
+    // 2. Khởi tạo Credential ID (Dùng cho One Tap & Nút Render)
+    if (google.accounts.id) {
+      try {
+        google.accounts.id.initialize({
+          client_id: clientId,
+          callback: (response) => {
+            if (response && response.credential) {
+              const payload = parseJwt(response.credential);
+              completeGoogleSignIn({
+                id: payload.sub || ('google-' + Date.now()),
+                name: payload.name || payload.given_name || 'Người dùng Google',
+                email: payload.email || 'user@gmail.com',
+                picture: payload.picture || null
+              });
+            }
+          },
+          auto_select: false,
+          cancel_on_tap_outside: true
         });
 
-        // Khi nút Google chính thức đã render, ẩn nút dự phòng để giao diện cực gọn
-        if (btnGoogleLogin) {
-          btnGoogleLogin.classList.add('hidden');
+        // Render nút đăng nhập Google chính thức vào container nếu có
+        const slot = document.getElementById('google-official-btn-slot');
+        if (slot) {
+          slot.innerHTML = '';
+          google.accounts.id.renderButton(slot, {
+            theme: 'outline',
+            size: 'large',
+            type: 'standard',
+            shape: 'rectangular',
+            text: 'signin_with',
+            logo_alignment: 'left',
+            width: 230
+          });
         }
-      }
 
-      // Kích hoạt Google One-Tap nếu chưa đăng nhập
-      if (!_currentUser) {
-        google.accounts.id.prompt();
+        // Kích hoạt Google One-Tap nếu chưa đăng nhập
+        if (!_currentUser) {
+          google.accounts.id.prompt();
+        }
+      } catch (err) {
+        console.warn('[Google GIS]', err);
       }
-    } catch (err) {
-      console.warn('[Google GIS]', err);
     }
   }
 
-  // Đăng nhập bằng Google
+  // Đăng nhập bằng Google (khi người dùng click nút chủ động)
   function handleGoogleLogin() {
     closeUserPopover();
 
-    // Thử kích hoạt Google One Tap / Google Prompt chính thức trước
+    // 1. ƯU TIÊN: Kích hoạt OAuth 2.0 Popup chính thức của Google (không bao giờ bị cool-down!)
+    if (_tokenClient) {
+      try {
+        _tokenClient.requestAccessToken({ prompt: 'select_account' });
+        return;
+      } catch (e) {
+        console.warn('Lỗi gọi requestAccessToken:', e);
+      }
+    }
+
+    // 2. Fallback: Thử gọi Google Prompt
     if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
       try {
         google.accounts.id.prompt((notification) => {
-          // Nếu Google chặn hiển thị do chưa cấu hình Authorized Origins trên Google Cloud
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            console.log('[Google GIS] Prompt không hiển thị, mở modal hỗ trợ:', notification.getNotDisplayedReason?.());
             if (googleAuthModal) googleAuthModal.classList.remove('hidden');
           }
         });
         return;
-      } catch (e) {
-        console.warn('Lỗi gọi google.accounts.id.prompt:', e);
-      }
+      } catch (e) {}
     }
 
-    // Fallback: Mở modal chọn tài khoản nếu SDK chưa sẵn sàng
+    // 3. Fallback cuối: Mở modal chọn tài khoản
     if (googleAuthModal) {
       googleAuthModal.classList.remove('hidden');
     }

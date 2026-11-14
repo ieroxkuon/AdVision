@@ -184,23 +184,23 @@ const UIController = {
     `).join('');
   },
 
-  // Thêm tin nhắn của người dùng vào hộp thoại
+  // Thêm tin nhắn của người dùng vào hộp thoại (phong cách Claude.ai)
   appendUserMessage(text, images) {
     let imgHtml = '';
     if (images && images.length > 0) {
       imgHtml = `<div class="flex flex-wrap gap-2 mb-2.5">${images.map(img =>
-        `<img src="${img.dataUrl}" alt="${img.fileName}" class="max-h-48 rounded-xl border border-slate-200 dark:border-borderDark object-cover shadow-sm" title="${img.fileName}">`
+        `<img src="${img.dataUrl}" alt="${img.fileName}" class="max-h-48 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder object-cover shadow-sm" title="${img.fileName}">`
       ).join('')}</div>`;
     }
     const textHtml = text ? `<p class="leading-relaxed">${text}</p>` : '';
 
     const html = `
       <div class="flex gap-3 justify-end items-start group">
-        <div class="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-950 px-4 py-3 rounded-2xl rounded-tr-sm text-[15px] font-normal max-w-lg leading-relaxed shadow-sm">
+        <div class="bg-[#F0EEE6] dark:bg-[#2A2926] text-claudeText dark:text-claudeDarkText border border-claudeBorder dark:border-claudeDarkBorder px-4 py-3 rounded-2xl rounded-tr-sm text-[15px] font-normal max-w-lg leading-relaxed shadow-sm">
           ${imgHtml}
           ${textHtml}
         </div>
-        <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5 border border-slate-300 dark:border-slate-700">
+        <div class="w-8 h-8 rounded-full bg-claudeBorder dark:bg-claudeDarkBorder text-claudeMuted dark:text-claudeDarkMuted flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5 border border-claudeBorder dark:border-claudeDarkBorder">
           <i class="fa-regular fa-user"></i>
         </div>
       </div>
@@ -209,13 +209,13 @@ const UIController = {
     this.scrollToBottom();
   },
 
-  // Hiển thị chỉ báo đang suy nghĩ / soạn tin
+  // Hiển thị chỉ báo đang suy nghĩ / soạn tin (phong cách Claude.ai)
   showTypingIndicator(message = "Đang soạn câu trả lời...") {
     this.isAiTyping = true;
     const html = `
       <div id="typing-indicator" class="flex gap-3 items-center">
         ${this.AI_AVATAR_HTML}
-        <div class="inline-flex items-center gap-2.5 bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark px-4 py-2.5 rounded-2xl rounded-tl-sm text-xs text-slate-500 dark:text-slate-400 shadow-sm">
+        <div class="inline-flex items-center gap-2.5 bg-white dark:bg-[#20201D] border border-claudeBorder dark:border-claudeDarkBorder px-4 py-2.5 rounded-2xl rounded-tl-sm text-xs text-claudeMuted dark:text-claudeDarkMuted shadow-sm">
           <div class="flex items-center gap-1">
             <div class="typing-dot"></div>
             <div class="typing-dot"></div>
@@ -305,7 +305,7 @@ const UIController = {
       <div class="flex gap-3.5 items-start">
         <div class="mt-1 shrink-0">${this.AI_AVATAR_HTML}</div>
         <div class="space-y-3 text-[15px] leading-relaxed flex-1 prose-refined">
-          <div id="${messageWrapperId}" class="bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-3 text-slate-800 dark:text-slate-200">
+          <div id="${messageWrapperId}" class="bg-white dark:bg-[#20201D] border border-claudeBorder dark:border-claudeDarkBorder p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-3 text-claudeText dark:text-claudeDarkText">
           </div>
         </div>
       </div>
@@ -536,7 +536,7 @@ const UIController = {
       <div class="flex gap-3.5 items-start">
         <div class="mt-1 shrink-0">${this.AI_AVATAR_HTML}</div>
         <div class="space-y-3 text-[15px] leading-relaxed flex-1 prose-refined">
-          <div class="bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-2.5 text-slate-800 dark:text-slate-200">
+          <div class="bg-white dark:bg-[#20201D] border border-claudeBorder dark:border-claudeDarkBorder p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-2.5 text-claudeText dark:text-claudeDarkText">
             ${lines.map(line => `<p>${this.formatInlineMarkdown(line)}</p>`).join('')}
           </div>
         </div>

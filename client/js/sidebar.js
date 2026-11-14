@@ -276,35 +276,98 @@ const SidebarController = (() => {
     }
   }
 
+  // Kiểm tra token từ URL hash (khi Google OAuth chuyển hướng về)
+  function checkGoogleRedirectToken() {
+    try {
+      const hash = window.location.hash;
+      if (hash && hash.includes('access_token=')) {
+        const params = new URLSearchParams(hash.substring(1));
+        const token = params.get('access_token');
+        if (token) {
+          // Xóa hash trên URL để giữ thanh địa chỉ sạch đẹp
+          history.replaceState(null, null, window.location.pathname + window.location.search);
+          
+          fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${token}` }
+          })
+          .then(res => res.json())
+          .then(userInfo => {
+            if (userInfo && userInfo.email) {
+              completeGoogleSignIn({
+                id: userInfo.sub || ('google-' + Date.now()),
+                name: userInfo.name || userInfo.given_name || 'Người dùng Google',
+                email: userInfo.email,
+                picture: userInfo.picture || null,
+                provider: 'google'
+              });
+            }
+          })
+          .catch(err => console.error("Lỗi fetch Google userinfo:", err));
+        }
+      }
+    } catch (e) {}
+  }
+
   // Đăng nhập bằng Google (khi người dùng click nút chủ động)
   function handleGoogleLogin() {
     closeUserPopover();
 
-    // 1. ƯU TIÊN: Kích hoạt OAuth 2.0 Popup chính thức của Google (không bao giờ bị cool-down!)
+    const clientId = (window.AdvConfig && AdvConfig.getGoogleClientId)
+      ? AdvConfig.getGoogleClientId()
+      : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
+
+    // 1. Nếu Token Client của Google SDK đã sẵn sàng
     if (_tokenClient) {
       try {
         _tokenClient.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
-        console.warn('Lỗi gọi requestAccessToken:', e);
+        console.warn('Lỗi gọi requestAccessToken, chuyển sang mở popup trực tiếp:', e);
       }
     }
 
-    // 2. Fallback: Thử gọi Google Prompt
-    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-      try {
-        google.accounts.id.prompt((notification) => {
-          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-            if (googleAuthModal) googleAuthModal.classList.remove('hidden');
+    // 2. Mở trực tiếp cửa sổ Google OAuth 2.0 chuẩn của accounts.google.com (100% bật lên)
+    try {
+      const redirectUri = window.location.origin + window.location.pathname;
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile&prompt=select_account`;
+      const popup = window.open(authUrl, 'GoogleSignIn', 'width=520,height=640,top=100,left=150');
+      
+      // Kiểm tra định kỳ popup khi nó chuyển hướng xong
+      if (popup) {
+        const interval = setInterval(() => {
+          try {
+            if (popup.closed) {
+              clearInterval(interval);
+              return;
+            }
+            if (popup.location && popup.location.hash && popup.location.hash.includes('access_token=')) {
+              const params = new URLSearchParams(popup.location.hash.substring(1));
+              const token = params.get('access_token');
+              popup.close();
+              clearInterval(interval);
+              if (token) {
+                fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                  headers: { Authorization: `Bearer ${token}` }
+                })
+                .then(res => res.json())
+                .then(userInfo => {
+                  completeGoogleSignIn({
+                    id: userInfo.sub,
+                    name: userInfo.name,
+                    email: userInfo.email,
+                    picture: userInfo.picture,
+                    provider: 'google'
+                  });
+                });
+              }
+            }
+          } catch (crossOriginErr) {
+            // Đợi đến khi popup redirect về cùng origin
           }
-        });
-        return;
-      } catch (e) {}
-    }
-
-    // 3. Fallback cuối: Mở modal chọn tài khoản
-    if (googleAuthModal) {
-      googleAuthModal.classList.remove('hidden');
+        }, 500);
+      }
+    } catch (err) {
+      console.error("Không thể mở popup Google:", err);
     }
   }
 
@@ -477,6 +540,9 @@ const SidebarController = (() => {
       light: document.getElementById('theme-btn-light'),
       dark: document.getElementById('theme-btn-dark')
     };
+
+    // Kiểm tra token nếu chuyển hướng về từ Google OAuth
+    checkGoogleRedirectToken();
 
     // Áp dụng Theme đã lưu
     applyTheme(_currentThemeMode);

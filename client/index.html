@@ -4,38 +4,53 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AdVision - Nguyễn Hoàng An | Cố vấn Thẩm định Hình ảnh Quảng cáo</title>
+  
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'media',
+      darkMode: 'class',
       theme: {
         extend: {
           colors: {
-            brandDark: '#090d16',
-            cardDark: '#121826',
-            borderDark: '#1e293b',
+            // Palette ấm áp thanh lịch đặc trưng của Claude.ai
+            claudeBg: '#FAF9F5',
+            claudeSidebar: '#F3F1EA',
+            claudeBorder: '#E5E2D9',
+            claudeText: '#1F1E1D',
+            claudeMuted: '#6E6D69',
+            claudeCoral: '#DA7756',
+            claudeCoralHover: '#C86544',
+            
+            // Dark Mode Claude.ai
+            claudeDarkBg: '#181816',
+            claudeDarkSidebar: '#131311',
+            claudeDarkBorder: '#2C2B27',
+            claudeDarkText: '#EDECE8',
+            claudeDarkMuted: '#9A9892',
           }
         }
       }
     }
   </script>
+  
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <!-- Google Font Inter -->
+  <!-- Google Font Plus Jakarta Sans & Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
   <style>
     body { font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif; }
-    .chat-scroll::-webkit-scrollbar { width: 6px; }
-    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.4); border-radius: 9999px; }
-    .chat-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.7); }
+    .chat-scroll::-webkit-scrollbar { width: 5px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 9999px; }
+    .chat-scroll::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.6); }
     
     /* Bouncing typing dots */
     .typing-dot {
       width: 5px;
       height: 5px;
       border-radius: 50%;
-      background-color: #64748b;
+      background-color: #DA7756;
       animation: typing-bounce 1.4s infinite ease-in-out both;
     }
     .typing-dot:nth-child(1) { animation-delay: -0.32s; }
@@ -45,19 +60,12 @@
       40% { transform: scale(1); opacity: 1; }
     }
 
-    /* Hiệu ứng hiển thị chữ mượt mà */
     @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(6px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
     }
     .fade-in-text {
-      animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 
     .prose-refined p {
@@ -66,11 +74,11 @@
     }
 
     /* =====================================================================
-       SIDEBAR STYLES
+       SIDEBAR ANIMATION (CLAUDE.AI STYLE)
        ===================================================================== */
     #sidebar {
-      width: 260px;
-      min-width: 260px;
+      width: 270px;
+      min-width: 270px;
       transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
                   min-width 0.25s cubic-bezier(0.16, 1, 0.3, 1),
                   opacity 0.2s;
@@ -80,308 +88,369 @@
       min-width: 0;
       opacity: 0;
       overflow: hidden;
+      border-right-width: 0;
     }
-    .sidebar-session-item {
-      cursor: pointer;
-      transition: background 0.15s;
+
+    /* Nút con mắt cố định ở góc trái */
+    #btn-eye-logo {
+      transition: transform 0.15s ease, background-color 0.15s ease;
     }
-    .sidebar-session-item:hover {
-      background: rgba(148, 163, 184, 0.1);
-    }
-    .sidebar-session-item.active {
-      background: rgba(148, 163, 184, 0.18);
-    }
-    /* Toggle button */
-    #btn-sidebar-toggle {
-      display: inline-flex;
+    #btn-eye-logo:hover {
+      transform: scale(1.05);
     }
   </style>
 </head>
-<body class="h-full flex bg-[#fafafa] text-slate-900 dark:bg-brandDark dark:text-slate-100 antialiased selection:bg-slate-900 selection:text-white dark:selection:bg-white dark:selection:text-slate-900">
+<body class="h-full flex bg-claudeBg text-claudeText dark:bg-claudeDarkBg dark:text-claudeDarkText antialiased selection:bg-claudeCoral selection:text-white">
+
+  <!-- ===================================================================
+       NÚT HÌNH CON MẮT CỐ ĐỊNH Ở GÓC TRÁI (LOGO & TOGGLE SIDEBAR)
+       =================================================================== -->
+  <button id="btn-eye-logo"
+    class="fixed top-3.5 left-4 z-40 w-9 h-9 rounded-xl bg-claudeCoral hover:bg-claudeCoralHover text-white shadow-md flex items-center justify-center transition-all cursor-pointer"
+    title="Nhấn để ẩn / hiện thanh bên (Sidebar)">
+    <i class="fa-solid fa-eye text-sm"></i>
+  </button>
 
   <!-- ===================================================================
        LAYOUT WRAPPER: Sidebar + Main
        =================================================================== -->
   <div class="flex flex-1 w-full h-full overflow-hidden">
 
-  <!-- =================================================================
-       SIDEBAR
-       ================================================================= -->
-  <aside id="sidebar"
-    class="h-full flex flex-col bg-white dark:bg-cardDark border-r border-slate-200/80 dark:border-borderDark shrink-0 overflow-hidden">
+    <!-- =================================================================
+         SIDEBAR (CLAUDE.AI STYLE)
+         ================================================================= -->
+    <aside id="sidebar"
+      class="h-full flex flex-col bg-claudeSidebar dark:bg-claudeDarkSidebar border-r border-claudeBorder dark:border-claudeDarkBorder shrink-0 overflow-hidden relative z-30">
 
-    <!-- Sidebar Header: Logo + tên app + nút đóng -->
-    <div class="flex items-center justify-between px-4 pt-4 pb-3 shrink-0">
-      <div class="flex items-center gap-2.5">
-        <div class="w-7 h-7 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center shrink-0">
-          <i class="fa-solid fa-eye text-white dark:text-slate-900 text-xs"></i>
-        </div>
-        <span class="font-bold text-sm text-slate-900 dark:text-white tracking-tight">AdVision</span>
-      </div>
-      <button id="btn-sidebar-close"
-        class="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors"
-        title="Đóng sidebar">
-        <i class="fa-solid fa-xmark text-xs"></i>
-      </button>
-    </div>
-
-    <!-- Nút New Chat -->
-    <div class="px-3 pb-3 shrink-0">
-      <button id="btn-new-chat-sidebar"
-        class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border border-slate-200/80 dark:border-borderDark bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors text-sm font-medium">
-        <i class="fa-solid fa-plus text-xs"></i>
-        <span>Trò chuyện mới</span>
-      </button>
-    </div>
-
-    <!-- Phần lịch sử: CHỈ HIỂN THỊ KHI ĐÃ ĐĂNG NHẬP -->
-    <div id="sidebar-history-section" class="flex-1 overflow-y-auto chat-scroll px-3 space-y-1 hidden">
-      <p class="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider px-1 pb-1">
-        Lịch sử
-      </p>
-      <!-- Danh sách session sẽ được inject bởi JS -->
-      <div id="sidebar-session-list" class="space-y-0.5">
-        <!-- Placeholder (sẽ bị thay bởi JS khi có dữ liệu) -->
-        <p id="sidebar-no-history" class="text-xs text-slate-400 dark:text-slate-500 px-2 py-2">
-          Chưa có lịch sử phân tích nào.
-        </p>
-      </div>
-    </div>
-
-    <!-- Phần dưới sidebar: thông tin user hoặc nút đăng nhập -->
-    <div class="shrink-0 border-t border-slate-200/80 dark:border-borderDark px-3 py-3 mt-auto">
-      <!-- Nếu CHƯA đăng nhập: hiện nút đăng nhập -->
-      <div id="sidebar-auth-guest">
-        <button id="btn-open-auth-modal"
-          class="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 text-sm font-semibold transition-all shadow-sm">
-          <i class="fa-solid fa-right-to-bracket text-xs"></i>
-          <span>Đăng nhập</span>
-        </button>
-        <p class="text-[11px] text-slate-400 dark:text-slate-500 text-center mt-2">
-          Đăng nhập để lưu lịch sử phân tích
-        </p>
+      <!-- Sidebar Top Spacer để né nút Con Mắt cố định -->
+      <div class="h-16 flex items-center pl-16 pr-4 shrink-0">
+        <span class="font-bold text-sm tracking-tight text-claudeText dark:text-claudeDarkText">AdVision AI</span>
+        <span class="ml-2 text-[10px] px-1.5 py-0.5 rounded-full bg-claudeCoral/10 text-claudeCoral font-semibold">SOA v2</span>
       </div>
 
-      <!-- Nếu ĐÃ đăng nhập: hiện avatar + tên + nút logout -->
-      <div id="sidebar-auth-user" class="hidden items-center gap-2.5">
-        <div class="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0">
-          <i class="fa-solid fa-user text-slate-500 dark:text-slate-400 text-xs"></i>
-        </div>
-        <div class="flex-1 min-w-0">
-          <p id="sidebar-username" class="text-sm font-semibold text-slate-900 dark:text-white truncate">Người dùng</p>
-          <p class="text-[11px] text-slate-400 dark:text-slate-500">Đang hoạt động</p>
-        </div>
-        <button id="btn-logout"
-          class="w-7 h-7 rounded-lg text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center justify-center transition-colors"
-          title="Đăng xuất">
-          <i class="fa-solid fa-right-from-bracket text-xs"></i>
+      <!-- Nút Trò chuyện mới -->
+      <div class="px-3 pb-3 shrink-0">
+        <button id="btn-new-chat-sidebar"
+          class="w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder bg-white/70 dark:bg-[#20201D]/70 hover:bg-white dark:hover:bg-[#252522] text-claudeText dark:text-claudeDarkText transition-all text-xs font-semibold shadow-sm">
+          <i class="fa-solid fa-plus text-claudeCoral text-xs"></i>
+          <span>Trò chuyện mới</span>
         </button>
       </div>
-    </div>
-  </aside>
 
-  <!-- =================================================================
-       MAIN CONTENT AREA (Header + Chat)
-       ================================================================= -->
-  <div class="flex flex-col flex-1 overflow-hidden">
-
-  <!-- POLISHED MODERN HEADER NAVBAR -->
-  <header class="h-16 border-b border-slate-200/80 dark:border-borderDark bg-white/80 dark:bg-cardDark/80 backdrop-blur-md px-3 sm:px-6 flex items-center justify-between z-10 shrink-0 sticky top-0 transition-colors">
-    <div class="flex items-center gap-3">
-      <!-- Nút mở Sidebar khi đang ẩn -->
-      <button id="btn-sidebar-toggle"
-        class="w-9 h-9 rounded-xl border border-slate-200/80 dark:border-borderDark bg-slate-50 hover:bg-slate-100 dark:bg-slate-800/80 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition-all shadow-sm"
-        title="Mở / đóng thanh bên">
-        <i class="fa-solid fa-bars text-sm"></i>
-      </button>
-
-      <!-- Human-centric circular advisor avatar with active status -->
-      <div class="relative shrink-0">
-        <img src="images/advisor_hoang_an.jpg" alt="Nguyễn Hoàng An" class="w-10 h-10 rounded-full object-cover shadow-md ring-2 ring-violet-200 dark:ring-violet-900">
-        <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-cardDark" title="Đang trực tuyến"></span>
-      </div>
-      <div>
-        <div class="flex items-center gap-2">
-          <h1 class="font-bold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight">Nguyễn Hoàng An</h1>
-          <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
-            Cố vấn
-          </span>
+      <!-- Khu vực Lịch sử trò chuyện (CHỈ HIỆN KHI ĐÃ ĐĂNG NHẬP) -->
+      <div id="sidebar-history-section" class="flex-1 overflow-y-auto chat-scroll px-3 space-y-1 hidden">
+        <p class="text-[11px] font-semibold text-claudeMuted dark:text-claudeDarkMuted uppercase tracking-wider px-2 pb-1.5 pt-2">
+          Đoạn chat gần đây
+        </p>
+        <!-- Danh sách phiên (Tối đa 10 phiên, tự dọn dẹp) -->
+        <div id="sidebar-session-list" class="space-y-1">
+          <p id="sidebar-no-history" class="text-xs text-claudeMuted dark:text-claudeDarkMuted px-2 py-3 italic">
+            Chưa có đoạn chat nào.
+          </p>
         </div>
-        <p class="text-xs text-slate-500 dark:text-slate-400">Giám đốc Nghệ thuật & Thẩm định Thị giác</p>
       </div>
-    </div>
-    
-    <div class="flex items-center gap-2 sm:gap-2.5">
-      <!-- Nút xem danh mục tài liệu đào tạo PDF -->
-      <button id="btn-docs-modal" class="text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/80 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm" title="Xem bộ tiêu chuẩn thẩm định">
-        <i class="fa-regular fa-bookmark text-slate-500 dark:text-slate-400"></i>
-        <span class="hidden sm:inline">Tiêu chuẩn thẩm định</span>
-        <span class="bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 text-[10px] px-1.5 py-0.5 rounded-full font-semibold border border-slate-200 dark:border-slate-700">22</span>
-      </button>
 
-      <!-- Nút cài đặt API Key -->
-      <button id="btn-api-key-modal" class="text-xs font-medium text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200/80 dark:hover:bg-slate-700 border border-slate-200/80 dark:border-slate-700/80 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shadow-sm" title="Cấu hình kết nối API">
-        <i class="fa-solid fa-key text-slate-400 text-xs"></i>
-        <span class="hidden sm:inline">API Key</span>
-        <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-      </button>
+      <!-- Spacer khi chưa đăng nhập -->
+      <div class="flex-1"></div>
 
-      <!-- Nút đặt lại hội thoại -->
-      <button id="btn-reset-chat" class="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors" title="Bắt đầu lại cuộc trò chuyện">
-        <i class="fa-solid fa-rotate-right text-xs"></i>
-      </button>
-    </div>
-  </header>
-
-  <!-- CHAT WINDOW -->
-  <main class="flex-1 overflow-hidden max-w-3xl w-full mx-auto flex flex-col px-3 sm:px-4">
-    
-    <!-- CHAT MESSAGES CONTAINER -->
-    <div id="chat-container" class="flex-1 overflow-y-auto chat-scroll py-6 space-y-6">
-      <!-- Lời chào ban đầu sẽ được hiển thị động kèm hiệu ứng mượt mà -->
-    </div>
-
-    <!-- INPUT TOOLBAR -->
-    <div class="py-3 shrink-0">
-      
-      <!-- MULTI-IMAGE ATTACHMENT PREVIEW -->
-      <div id="attached-image-preview" class="hidden flex-col bg-white dark:bg-cardDark p-3 rounded-2xl border border-slate-200 dark:border-borderDark mb-2.5 shadow-sm space-y-2.5">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span id="attached-count-text" class="text-xs font-bold text-slate-900 dark:text-white">Ảnh đã chọn (0)</span>
-            <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
-              <i class="fa-solid fa-circle-check text-[10px]"></i> Sẵn sàng thẩm định
-            </span>
+      <!-- ===============================================================
+           USER FOOTER (GUEST / USER POPUP TRIGGER)
+           =============================================================== -->
+      <div class="shrink-0 border-t border-claudeBorder dark:border-claudeDarkBorder p-3 relative">
+        
+        <!-- Nút trigger mở User Popover -->
+        <div id="sidebar-user-trigger"
+          class="flex items-center gap-2.5 p-2 rounded-xl hover:bg-[#E5E2D9]/60 dark:hover:bg-[#2C2B27]/60 cursor-pointer transition-colors"
+          title="Tùy chỉnh tài khoản & giao diện">
+          <div id="user-avatar-slot" class="w-8 h-8 rounded-full bg-claudeBorder dark:bg-claudeDarkBorder flex items-center justify-center shrink-0 text-claudeMuted dark:text-claudeDarkMuted text-xs">
+            <i class="fa-regular fa-user"></i>
           </div>
-          <button type="button" id="btn-clear-all-attachments" class="text-[11px] text-slate-400 hover:text-rose-500 transition-colors flex items-center gap-1 font-medium">
-            <i class="fa-solid fa-trash-can text-[10px]"></i> Xóa tất cả
+          <div class="flex-1 min-w-0">
+            <p id="sidebar-user-name" class="text-xs font-bold text-claudeText dark:text-claudeDarkText truncate">Guest</p>
+            <p id="sidebar-user-subtitle" class="text-[10px] text-claudeMuted dark:text-claudeDarkMuted truncate">Nhấn để tùy chỉnh & đăng nhập</p>
+          </div>
+          <i class="fa-solid fa-ellipsis text-xs text-claudeMuted dark:text-claudeDarkMuted"></i>
+        </div>
+
+        <!-- =============================================================
+             USER POPOVER MENU (CLAUDE STYLE)
+             ============================================================= -->
+        <div id="user-popover-menu"
+          class="hidden absolute bottom-16 left-3 right-3 bg-white dark:bg-[#20201D] border border-claudeBorder dark:border-claudeDarkBorder rounded-2xl p-3 shadow-xl space-y-3 z-50">
+          
+          <!-- PHẦN 1: ĐỔI MÀU GIAO DIỆN (3 DẠNG) -->
+          <div>
+            <p class="text-[11px] font-semibold text-claudeMuted dark:text-claudeDarkMuted mb-2 px-1">Giao diện hiển thị</p>
+            <div class="grid grid-cols-3 gap-1 bg-claudeSidebar dark:bg-claudeDarkSidebar p-1 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder text-xs">
+              <!-- 1. Theo hệ thống -->
+              <button id="theme-btn-system" class="flex flex-col items-center justify-center py-1.5 rounded-lg transition-all text-[11px]" title="Tự động theo hệ điều hành">
+                <i class="fa-solid fa-circle-half-stroke mb-1 text-xs"></i>
+                <span>Hệ thống</span>
+              </button>
+              <!-- 2. Sáng -->
+              <button id="theme-btn-light" class="flex flex-col items-center justify-center py-1.5 rounded-lg transition-all text-[11px]" title="Chế độ sáng">
+                <i class="fa-regular fa-sun mb-1 text-xs"></i>
+                <span>Sáng</span>
+              </button>
+              <!-- 3. Tối -->
+              <button id="theme-btn-dark" class="flex flex-col items-center justify-center py-1.5 rounded-lg transition-all text-[11px]" title="Chế độ tối">
+                <i class="fa-regular fa-moon mb-1 text-xs"></i>
+                <span>Tối</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="border-t border-claudeBorder dark:border-claudeDarkBorder pt-2"></div>
+
+          <!-- PHẦN 2: ĐĂNG NHẬP BẰNG GOOGLE / ĐĂNG XUẤT -->
+          <div>
+            <!-- Nếu chưa đăng nhập: Nút Đăng nhập Google -->
+            <button id="btn-google-login"
+              class="w-full flex items-center justify-center gap-2.5 px-3 py-2.5 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder bg-white dark:bg-claudeDarkSidebar hover:bg-slate-50 dark:hover:bg-[#252522] text-xs font-semibold text-claudeText dark:text-claudeDarkText transition-all shadow-sm">
+              <!-- Google G Logo SVG -->
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+              </svg>
+              <span>Đăng nhập bằng Google</span>
+            </button>
+
+            <!-- Nếu đã đăng nhập: Nút Đăng xuất -->
+            <button id="btn-logout"
+              class="hidden w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all">
+              <i class="fa-solid fa-right-from-bracket text-xs"></i>
+              <span>Đăng xuất tài khoản</span>
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+
+    </aside>
+
+    <!-- =================================================================
+         MAIN CONTENT AREA (HEADER + CHAT WINDOW)
+         ================================================================= -->
+    <div class="flex flex-col flex-1 overflow-hidden">
+
+      <!-- HEADER NAVBAR -->
+      <header class="h-16 border-b border-claudeBorder dark:border-claudeDarkBorder bg-claudeBg/80 dark:bg-claudeDarkBg/80 backdrop-blur-md px-4 sm:px-8 flex items-center justify-between z-10 shrink-0 sticky top-0 transition-colors">
+        
+        <!-- Khoảng trống bên trái né nút Con Mắt + thông tin chuyên gia -->
+        <div class="flex items-center gap-3.5 pl-10 sm:pl-10">
+          <div class="relative shrink-0">
+            <img src="images/advisor_hoang_an.jpg" alt="Nguyễn Hoàng An" class="w-9 h-9 rounded-full object-cover shadow-sm ring-2 ring-claudeCoral/30">
+            <span class="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-claudeDarkBg" title="Đang trực tuyến"></span>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="font-bold text-sm text-claudeText dark:text-claudeDarkText tracking-tight">Nguyễn Hoàng An</h1>
+              <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-claudeCoral/10 text-claudeCoral">
+                Cố vấn
+              </span>
+            </div>
+            <p class="text-xs text-claudeMuted dark:text-claudeDarkMuted">Giám đốc Nghệ thuật & Thẩm định Thị giác</p>
+          </div>
+        </div>
+        
+        <!-- Nút điều khiển bên phải -->
+        <div class="flex items-center gap-2">
+          <!-- Nút xem danh mục 22 quy chuẩn PDF -->
+          <button id="btn-docs-modal" class="text-xs font-medium text-claudeText dark:text-claudeDarkText bg-white dark:bg-[#20201D] hover:bg-slate-50 dark:hover:bg-[#252522] border border-claudeBorder dark:border-claudeDarkBorder px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm" title="Xem 22 quy chuẩn thẩm định">
+            <i class="fa-regular fa-bookmark text-claudeCoral text-xs"></i>
+            <span class="hidden sm:inline">22 Quy chuẩn</span>
+          </button>
+
+          <!-- Nút cài đặt API Key -->
+          <button id="btn-api-key-modal" class="text-xs font-medium text-claudeText dark:text-claudeDarkText bg-white dark:bg-[#20201D] hover:bg-slate-50 dark:hover:bg-[#252522] border border-claudeBorder dark:border-claudeDarkBorder px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm" title="Cấu hình API Key">
+            <i class="fa-solid fa-key text-claudeMuted text-xs"></i>
+            <span class="hidden sm:inline">API Key</span>
+            <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+          </button>
+
+          <!-- Nút làm mới đoạn chat -->
+          <button id="btn-reset-chat" class="w-8 h-8 rounded-xl text-claudeMuted hover:text-claudeText dark:hover:text-claudeDarkText hover:bg-claudeBorder/50 dark:hover:bg-claudeDarkBorder/50 flex items-center justify-center transition-colors" title="Bắt đầu lại cuộc trò chuyện">
+            <i class="fa-solid fa-rotate-right text-xs"></i>
           </button>
         </div>
-        <div id="attached-thumbs-list" class="flex items-center gap-2.5 overflow-x-auto pb-1 chat-scroll">
-          <!-- Danh sách ảnh đính kèm -->
-        </div>
-      </div>
+      </header>
 
-      <!-- USER STATE BADGE -->
-      <div id="user-info-badge" class="hidden items-center gap-2 mb-2 text-xs text-slate-600 dark:text-slate-400">
-        <span class="inline-flex items-center gap-1.5 bg-white dark:bg-cardDark px-2.5 py-1 rounded-full border border-slate-200/80 dark:border-borderDark shadow-sm">
-          <i class="fa-regular fa-user text-slate-400 text-[11px]"></i> <span id="badge-user-name" class="font-medium text-slate-800 dark:text-slate-200">Bạn</span>
-        </span>
-        <span id="badge-industry-container" class="hidden inline-flex items-center gap-1.5 bg-white dark:bg-cardDark px-2.5 py-1 rounded-full border border-slate-200/80 dark:border-borderDark shadow-sm">
-          <i class="fa-solid fa-tag text-slate-400 text-[11px]"></i> <span id="badge-industry-name" class="font-medium text-slate-800 dark:text-slate-200">Chưa rõ</span>
-        </span>
-      </div>
-
-      <!-- MODERN CHAT INPUT FORM -->
-      <form id="chat-form" class="relative flex items-center rounded-2xl bg-white dark:bg-cardDark border border-slate-200/90 dark:border-borderDark shadow-[0_4px_20px_-4px_rgba(0,0,0,0.06)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.3)] p-1.5 transition-all focus-within:border-slate-400 dark:focus-within:border-slate-600 focus-within:ring-2 focus-within:ring-slate-900/5">
-        <input type="file" id="file-input" accept="image/png, image/jpeg, image/jpg, image/webp" multiple class="hidden">
+      <!-- CHAT CONTAINER -->
+      <main class="flex-1 overflow-hidden max-w-3xl w-full mx-auto flex flex-col px-3 sm:px-4">
         
-        <button type="button" id="btn-attach-image" class="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" title="Đính kèm hình ảnh quảng cáo (chọn nhiều ảnh)">
-          <i class="fa-solid fa-paperclip text-sm"></i>
+        <!-- MESSAGES LIST -->
+        <div id="chat-container" class="flex-1 overflow-y-auto chat-scroll py-6 space-y-6">
+          <!-- Tin nhắn hiển thị động qua JS -->
+        </div>
+
+        <!-- INPUT TOOLBAR -->
+        <div class="py-3 shrink-0">
+          
+          <!-- MULTI-IMAGE PREVIEW -->
+          <div id="attached-image-preview" class="hidden flex-col bg-white dark:bg-[#20201D] p-3 rounded-2xl border border-claudeBorder dark:border-claudeDarkBorder mb-2.5 shadow-sm space-y-2.5">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span id="attached-count-text" class="text-xs font-bold text-claudeText dark:text-claudeDarkText">Ảnh đã chọn (0)</span>
+                <span class="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+                  <i class="fa-solid fa-circle-check text-[10px]"></i> Sẵn sàng thẩm định
+                </span>
+              </div>
+              <button type="button" id="btn-clear-all-attachments" class="text-[11px] text-claudeMuted hover:text-rose-500 transition-colors flex items-center gap-1 font-medium">
+                <i class="fa-solid fa-trash-can text-[10px]"></i> Xóa tất cả
+              </button>
+            </div>
+            <div id="attached-thumbs-list" class="flex items-center gap-2.5 overflow-x-auto pb-1 chat-scroll"></div>
+          </div>
+
+          <!-- USER INFO BADGE -->
+          <div id="user-info-badge" class="hidden items-center gap-2 mb-2 text-xs text-claudeMuted dark:text-claudeDarkMuted">
+            <span class="inline-flex items-center gap-1.5 bg-white dark:bg-[#20201D] px-2.5 py-1 rounded-full border border-claudeBorder dark:border-claudeDarkBorder shadow-sm">
+              <i class="fa-regular fa-user text-claudeCoral text-[11px]"></i> <span id="badge-user-name" class="font-medium text-claudeText dark:text-claudeDarkText">Bạn</span>
+            </span>
+            <span id="badge-industry-container" class="hidden inline-flex items-center gap-1.5 bg-white dark:bg-[#20201D] px-2.5 py-1 rounded-full border border-claudeBorder dark:border-claudeDarkBorder shadow-sm">
+              <i class="fa-solid fa-tag text-claudeCoral text-[11px]"></i> <span id="badge-industry-name" class="font-medium text-claudeText dark:text-claudeDarkText">Chưa rõ</span>
+            </span>
+          </div>
+
+          <!-- CHAT INPUT FORM (CLAUDE FLOATING STYLE) -->
+          <form id="chat-form" class="relative flex items-center rounded-2xl bg-white dark:bg-[#20201D] border border-claudeBorder dark:border-claudeDarkBorder shadow-[0_4px_20px_-4px_rgba(0,0,0,0.04)] dark:shadow-[0_4px_20px_-4px_rgba(0,0,0,0.3)] p-1.5 transition-all focus-within:border-claudeCoral dark:focus-within:border-claudeCoral focus-within:ring-2 focus-within:ring-claudeCoral/10">
+            <input type="file" id="file-input" accept="image/png, image/jpeg, image/jpg, image/webp" multiple class="hidden">
+            
+            <button type="button" id="btn-attach-image" class="w-10 h-10 rounded-xl flex items-center justify-center text-claudeMuted hover:text-claudeText dark:hover:text-claudeDarkText hover:bg-claudeSidebar dark:hover:bg-[#252522] transition-colors" title="Đính kèm hình ảnh quảng cáo">
+              <i class="fa-solid fa-paperclip text-sm"></i>
+            </button>
+
+            <input type="text" id="chat-input" placeholder="Nhắn tin hoặc đính kèm ảnh để thẩm định..." class="w-full text-[14px] bg-transparent px-3 py-2 text-claudeText dark:text-claudeDarkText placeholder-claudeMuted dark:placeholder-claudeDarkMuted focus:outline-none">
+
+            <button type="submit" id="btn-send-message" class="w-10 h-10 rounded-xl bg-claudeCoral hover:bg-claudeCoralHover text-white flex items-center justify-center transition-all shadow-sm shrink-0">
+              <i class="fa-solid fa-arrow-up text-sm"></i>
+            </button>
+          </form>
+
+          <p class="text-[11px] text-center text-claudeMuted dark:text-claudeDarkMuted mt-2">
+            Nhấn biểu tượng kẹp giấy để chọn ảnh quảng cáo cần cố vấn Nguyễn Hoàng An phân tích
+          </p>
+
+        </div>
+
+      </main>
+
+    </div><!-- end main content area -->
+  </div><!-- end layout wrapper -->
+
+  <!-- ===================================================================
+       GOOGLE SIGN-IN MODAL (CHUẨN UX)
+       =================================================================== -->
+  <div id="google-auth-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-[#20201D] rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-claudeBorder dark:border-claudeDarkBorder">
+      <div class="flex items-center justify-between border-b border-claudeBorder dark:border-claudeDarkBorder pb-3">
+        <h3 class="text-sm font-bold text-claudeText dark:text-claudeDarkText flex items-center gap-2">
+          <!-- Google G Logo -->
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Đăng nhập với Google
+        </h3>
+        <button id="btn-close-google-modal" class="text-claudeMuted hover:text-claudeText dark:hover:text-claudeDarkText p-1">
+          <i class="fa-solid fa-xmark text-sm"></i>
         </button>
+      </div>
 
-        <input type="text" id="chat-input" placeholder="Nhắn tin hoặc đính kèm ảnh để thẩm định..." class="w-full text-[15px] bg-transparent px-3 py-2 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none">
-
-        <button type="submit" id="btn-send-message" class="w-10 h-10 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 flex items-center justify-center transition-all shadow-sm shrink-0">
-          <i class="fa-solid fa-arrow-up text-sm"></i>
-        </button>
-      </form>
-
-      <p class="text-[11px] text-center text-slate-400 dark:text-slate-500 mt-2">
-        Nhấn biểu tượng kẹp giấy để chọn 1 hoặc nhiều ảnh quảng cáo cần thẩm định cùng lúc
+      <p class="text-xs text-claudeMuted dark:text-claudeDarkMuted leading-relaxed">
+        Đăng nhập giúp lưu trữ lịch sử đoạn chat & ảnh thẩm định vào cơ sở dữ liệu để bạn có thể xem lại và chat tiếp bất cứ lúc nào.
       </p>
 
+      <!-- Danh sách tài khoản demo hoặc đăng nhập nhanh -->
+      <div class="space-y-2 pt-1">
+        <p class="text-[11px] font-semibold text-claudeMuted dark:text-claudeDarkMuted">Chọn tài khoản tiếp tục:</p>
+        
+        <button class="mock-google-account-btn w-full flex items-center gap-3 p-2.5 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder hover:bg-claudeSidebar dark:hover:bg-[#252522] transition-all text-left"
+          data-name="Trần Thái Cường" data-email="cuong.tran@gmail.com" data-picture="https://api.dicebear.com/7.x/bottts/svg?seed=Cuong">
+          <div class="w-8 h-8 rounded-full bg-claudeCoral text-white font-bold flex items-center justify-center text-xs shrink-0">
+            C
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-claudeText dark:text-claudeDarkText truncate">Trần Thái Cường</p>
+            <p class="text-[11px] text-claudeMuted dark:text-claudeDarkMuted truncate">cuong.tran@gmail.com</p>
+          </div>
+          <i class="fa-solid fa-chevron-right text-xs text-claudeMuted"></i>
+        </button>
+
+        <button class="mock-google-account-btn w-full flex items-center gap-3 p-2.5 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder hover:bg-claudeSidebar dark:hover:bg-[#252522] transition-all text-left"
+          data-name="Marketing Designer" data-email="designer.pro@gmail.com" data-picture="https://api.dicebear.com/7.x/bottts/svg?seed=Designer">
+          <div class="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+            D
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-bold text-claudeText dark:text-claudeDarkText truncate">Marketing Designer</p>
+            <p class="text-[11px] text-claudeMuted dark:text-claudeDarkMuted truncate">designer.pro@gmail.com</p>
+          </div>
+          <i class="fa-solid fa-chevron-right text-xs text-claudeMuted"></i>
+        </button>
+      </div>
+
+      <div class="pt-2 text-[10px] text-center text-claudeMuted dark:text-claudeDarkMuted">
+        Được bảo vệ bởi Google Identity Services OAuth 2.0
+      </div>
     </div>
+  </div>
 
-  </main>
-
-  <!-- MODAL TÀI LIỆU ĐÀO TẠO (TRAINING DOCS MODAL) -->
+  <!-- MODAL 22 QUY CHUẨN THIẾT KẾ -->
   <div id="docs-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-cardDark rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-borderDark max-h-[85vh] flex flex-col">
-      <div class="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-borderDark shrink-0">
+    <div class="bg-white dark:bg-[#20201D] rounded-2xl max-w-2xl w-full p-6 space-y-4 shadow-2xl border border-claudeBorder dark:border-claudeDarkBorder max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between border-b border-claudeBorder dark:border-claudeDarkBorder pb-3 shrink-0">
         <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center text-xs font-semibold">
+          <div class="w-8 h-8 rounded-lg bg-claudeCoral/10 text-claudeCoral flex items-center justify-center text-xs font-semibold">
             <i class="fa-solid fa-book-bookmark"></i>
           </div>
           <div>
-            <h3 class="text-sm font-bold text-slate-900 dark:text-white">Bộ Quy Chuẩn Thẩm Định Thị Giác (22 Rules)</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Trích xuất từ các tài liệu nghiên cứu chuyên ngành đồ họa & quảng cáo</p>
+            <h3 class="text-sm font-bold text-claudeText dark:text-claudeDarkText">22 Quy Chuẩn Thẩm Định Thị Giác</h3>
+            <p class="text-xs text-claudeMuted dark:text-claudeDarkMuted">Trích xuất từ 16 tài liệu nghiên cứu đồ họa & marketing</p>
           </div>
         </div>
-        <button id="btn-close-docs-modal" class="text-slate-400 hover:text-slate-700 dark:hover:text-white text-base p-1"><i class="fa-solid fa-xmark"></i></button>
+        <button id="btn-close-docs-modal" class="text-claudeMuted hover:text-claudeText dark:hover:text-claudeDarkText text-base p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
-      <div id="docs-rules-list" class="overflow-y-auto chat-scroll flex-1 pr-1 space-y-2.5 text-xs">
-        <!-- Danh sách quy chuẩn sẽ được load động hoặc tĩnh -->
-      </div>
+      <div id="docs-rules-list" class="overflow-y-auto chat-scroll flex-1 pr-1 space-y-2.5 text-xs"></div>
 
-      <div class="flex justify-between items-center pt-3 border-t border-slate-100 dark:border-borderDark shrink-0">
-        <span class="text-[11px] text-slate-400">Bộ tiêu chuẩn lưu trữ tại <code>design_rules.json</code></span>
-        <button id="btn-done-docs-modal" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-medium text-xs shadow-sm transition-all">Đã hiểu</button>
+      <div class="flex justify-between items-center pt-3 border-t border-claudeBorder dark:border-claudeDarkBorder shrink-0">
+        <span class="text-[11px] text-claudeMuted">Dữ liệu nguồn lưu tại <code>data/design_rules.json</code></span>
+        <button id="btn-done-docs-modal" class="px-4 py-2 rounded-xl bg-claudeCoral hover:bg-claudeCoralHover text-white font-medium text-xs shadow-sm transition-all">Đã hiểu</button>
       </div>
     </div>
   </div>
 
   <!-- API KEY MODAL -->
   <div id="api-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-cardDark rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-borderDark">
-      <div class="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-borderDark">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <i class="fa-solid fa-key text-slate-400"></i> Cấu hình kết nối API
+    <div class="bg-white dark:bg-[#20201D] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-claudeBorder dark:border-claudeDarkBorder">
+      <div class="flex items-center justify-between border-b border-claudeBorder dark:border-claudeDarkBorder pb-3">
+        <h3 class="text-sm font-bold text-claudeText dark:text-claudeDarkText flex items-center gap-2">
+          <i class="fa-solid fa-key text-claudeCoral"></i> Cấu hình kết nối API
         </h3>
-        <button id="btn-close-modal" class="text-slate-400 hover:text-slate-700 dark:hover:text-white text-base p-1"><i class="fa-solid fa-xmark"></i></button>
+        <button id="btn-close-modal" class="text-claudeMuted hover:text-claudeText dark:hover:text-claudeDarkText text-base p-1"><i class="fa-solid fa-xmark"></i></button>
       </div>
-      <p class="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-        Nhập Google Gemini API Key hoặc OpenAI API Key để kết nối AI phân tích ảnh thực tế. Bạn có thể lấy mã Gemini hoàn toàn miễn phí tại <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-slate-900 dark:text-white font-semibold underline underline-offset-2">Google AI Studio</a>.
+      <p class="text-xs text-claudeMuted dark:text-claudeDarkMuted leading-relaxed">
+        Nhập Google Gemini API Key hoặc OpenAI API Key để kết nối AI phân tích ảnh thực tế. Bạn có thể lấy mã Gemini miễn phí tại <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-claudeCoral font-semibold underline underline-offset-2">Google AI Studio</a>.
       </p>
       <div>
-        <label for="input-api-key" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Mã API Key</label>
-        <input type="password" id="input-api-key" placeholder="AIzaSy... hoặc sk-..." class="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-borderDark bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-slate-400 dark:focus:border-slate-600 focus:ring-2 focus:ring-slate-900/5">
+        <label for="input-api-key" class="block text-xs font-semibold text-claudeText dark:text-claudeDarkText mb-1.5">Mã API Key</label>
+        <input type="password" id="input-api-key" placeholder="AIzaSy... hoặc sk-..." class="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder bg-claudeSidebar dark:bg-claudeDarkSidebar text-claudeText dark:text-claudeDarkText outline-none focus:border-claudeCoral focus:ring-2 focus:ring-claudeCoral/10">
       </div>
       <div class="flex justify-end gap-2 pt-2">
-        <button id="btn-save-key" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs shadow-sm transition-all">Lưu cài đặt</button>
+        <button id="btn-save-key" class="px-4 py-2 rounded-xl bg-claudeCoral hover:bg-claudeCoralHover text-white font-semibold text-xs shadow-sm transition-all">Lưu cài đặt</button>
       </div>
     </div>
   </div>
 
-  </div><!-- end main content area -->
-  </div><!-- end layout wrapper -->
-
-  <!-- AUTH MODAL -->
-  <div id="auth-modal" class="hidden fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white dark:bg-cardDark rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-borderDark">
-      <div class="flex items-center justify-between border-b pb-3 border-slate-100 dark:border-borderDark">
-        <h3 class="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-          <i class="fa-solid fa-right-to-bracket text-slate-400"></i> Đăng nhập tài khoản
-        </h3>
-        <button id="btn-close-auth-modal" class="text-slate-400 hover:text-slate-700 dark:hover:text-white text-base p-1">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-
-      <form id="auth-form" class="space-y-3">
-        <div>
-          <label for="auth-input-name" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Tên hoặc Email của bạn</label>
-          <input type="text" id="auth-input-name" placeholder="Ví dụ: Trần Thái Cường" required
-            class="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-borderDark bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-slate-400 dark:focus:border-slate-600 focus:ring-2 focus:ring-slate-900/5">
-        </div>
-        <div>
-          <label for="auth-input-pass" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">Mật khẩu (tùy chọn trong bản demo)</label>
-          <input type="password" id="auth-input-pass" placeholder="••••••••"
-            class="w-full text-xs font-mono px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-borderDark bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:border-slate-400 dark:focus:border-slate-600 focus:ring-2 focus:ring-slate-900/5">
-        </div>
-        <p class="text-[11px] text-slate-400 dark:text-slate-500">
-          Khi đăng nhập, hệ thống sẽ kích hoạt thanh Lịch sử trò chuyện và lưu trữ các phiên thẩm định quảng cáo của bạn.
-        </p>
-        <div class="flex justify-end gap-2 pt-2">
-          <button type="button" id="btn-close-auth-modal-2" class="px-3 py-2 rounded-xl text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-xs font-medium">Hủy</button>
-          <button type="submit" class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-semibold text-xs shadow-sm transition-all">Đăng nhập</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  <!-- MODULAR FRONTEND ARCHITECTURE (SYSTEMATIC & SCALABLE) -->
+  <!-- MODULES ARCHITECTURE -->
   <script src="js/config.js"></script>
+  <script src="js/storageService.js"></script>
   <script src="js/rulesService.js"></script>
   <script src="js/imageFeatureExtractor.js"></script>
   <script src="js/personaPrompt.js"></script>

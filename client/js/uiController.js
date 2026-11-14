@@ -528,6 +528,24 @@ const UIController = {
     this.isAiTyping = false;
   },
 
+  // Render tin nhắn AI tĩnh (dùng khi khôi phục lịch sử chat cũ không cần stream từng từ)
+  renderStaticAiMessage(text) {
+    if (!text) return;
+    const lines = text.split('\n').filter(l => l.trim().length > 0);
+    const html = `
+      <div class="flex gap-3.5 items-start">
+        <div class="mt-1 shrink-0">${this.AI_AVATAR_HTML}</div>
+        <div class="space-y-3 text-[15px] leading-relaxed flex-1 prose-refined">
+          <div class="bg-white dark:bg-cardDark border border-slate-200/80 dark:border-borderDark p-4 sm:p-5 rounded-2xl rounded-tl-sm shadow-sm space-y-2.5 text-slate-800 dark:text-slate-200">
+            ${lines.map(line => `<p>${this.formatInlineMarkdown(line)}</p>`).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+    this.elements.chatContainer.insertAdjacentHTML('beforeend', html);
+    this.scrollToBottom();
+  },
+
   // Làm sạch văn bản AI trả về theo đúng chuẩn không ký tự markdown thô
   sanitizeStrictRules(str) {
     if (!str) return "";

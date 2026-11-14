@@ -42,6 +42,7 @@ const AppController = {
     conversationStage: 'idle',
     // Lưu mục tiêu chiến dịch đã được briefing (vd: "sales", "branding", "launch")
     campaignGoal: (() => { try { return localStorage.getItem('adv_campaign_goal') || ""; } catch(e) { return ""; } })(),
+    currentSessionId: 'sess-' + Date.now(),
     lastFailedRequest: null    // Lưu lại request để retry khi lỗi API
   },
 
@@ -755,9 +756,11 @@ const AppController = {
               const titleName = (sentImages[0] && sentImages[0].fileName) ? sentImages[0].fileName : 'Thẩm định ảnh quảng cáo';
               const industry = this.state.userIndustry ? ` (${this.state.userIndustry})` : '';
               window.SidebarController.addSession({
-                id: 'sess-' + Date.now(),
+                id: this.state.currentSessionId,
                 title: titleName + industry,
-                date: 'Hôm nay'
+                activeImageData: this.state.activeImageData,
+                conversationHistory: this.state.conversationHistory,
+                stage: this.state.conversationStage
               });
             }
           } catch(e) {}
@@ -850,7 +853,62 @@ const AppController = {
       }
 
       await UIController.streamLines(lines, nextActions);
+
+      // Cập nhật session vào Database sau mỗi lượt trao đổi
+      try {
+        if (window.SidebarController) {
+          window.SidebarController.addSession({
+            id: this.state.currentSessionId,
+            title: this.state.activeImageData?.fileName || 'Đoạn chat thẩm định hình ảnh',
+            activeImageData: this.state.activeImageData,
+            conversationHistory: this.state.conversationHistory,
+            stage: this.state.conversationStage
+          });
+        }
+      } catch (e) {}
     }
+  },
+
+  // Khôi phục một phiên trò chuyện cũ từ Database (IndexedDB) để chat tiếp
+  async restoreSession(session) {
+    if (!session) return;
+
+    this.state.currentSessionId = session.id;
+    this.state.activeImageData = session.activeImageData || null;
+    this.state.conversationHistory = session.conversationHistory || [];
+    this.state.conversationStage = session.stage || 'image_overview';
+
+    // Xóa sạch khung chat
+    UIController.elements.chatContainer.innerHTML = '';
+
+    // Render lại toàn bộ lịch sử trò chuyện
+    const history = this.state.conversationHistory;
+    for (let i = 0; i < history.length; i++) {
+      const turn = history[i];
+      if (turn.role === 'user') {
+        const attached = (i === 0 && this.state.activeImageData)
+          ? [{ dataUrl: `data:${this.state.activeImageData.mimeType};base64,${this.state.activeImageData.base64}`, fileName: this.state.activeImageData.fileName || 'ảnh_quảng_cáo' }]
+          : [];
+        UIController.appendUserMessage(turn.text, attached);
+      } else if (turn.role === 'model') {
+        UIController.renderStaticAiMessage(turn.text);
+      }
+    }
+
+    // Hiển thị thông báo nhẹ
+    const noticeHtml = `
+      <div class="my-4 text-center">
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#E5E2D9]/70 dark:bg-[#2C2B27]/70 text-[#6E6D69] dark:text-[#9A9892] border border-[#E5E2D9] dark:border-[#2C2B27]">
+          <i class="fa-solid fa-clock-rotate-left text-[#DA7756]"></i>
+          Đã khôi phục đoạn chat: <strong>${session.title || 'Phiên thẩm định'}</strong>. Bạn có thể tiếp tục nhắn tin trao đổi với Nguyễn Hoàng An!
+        </span>
+      </div>
+    `;
+    UIController.elements.chatContainer.insertAdjacentHTML('beforeend', noticeHtml);
+    UIController.scrollToBottom();
+
+    // Cập nhật trạng thái và placeholder
+    this.updateSystemStatus();
   }
 };
 

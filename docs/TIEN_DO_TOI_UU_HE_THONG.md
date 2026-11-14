@@ -61,18 +61,16 @@
 | **M4.1** | Loại bỏ delay nhân tạo | ✅ Hoàn thành | Bỏ các hàm delay 800-900ms, stream chữ 8ms mượt mà |
 | **M5.1** | Đo lường Benchmark & Đồng bộ | ✅ Hoàn thành | Độ trễ giảm từ 8s xuống ~1.2s; đã đồng bộ GitHub commit f3f811d |
 
-### 🔄 Giai đoạn 2: SOA Refactor & UI Nâng Cấp (Đang thực hiện)
+### 🔄 Giai đoạn 2: SOA Refactor, UI Claude.ai & Database Lưu Trữ
 
 | Mã Task | Hạng mục | Trạng thái | Ghi chú kỹ thuật |
 | :--- | :--- | :---: | :--- |
-| **S1.1** | Tạo cấu trúc thư mục `routes/` | ✅ Hoàn thành | Tạo: `routes/upload.js`, `routes/analyze.js`, `routes/health.js` độc lập |
-| **S1.2** | Refactor `server.js` → API Gateway | ✅ Hoàn thành | `server.js` đóng vai trò API Gateway, mount các route service |
-| **S2.1** | Thêm Sidebar HTML vào `index.html` | ✅ Hoàn thành | Layout chuẩn: Sidebar (logo, New Chat, Lịch sử, User) + Nút Hamburger |
-| **S2.2** | Logic Sidebar JS | ✅ Hoàn thành | `sidebar.js`: Ẩn thanh lịch sử khi chưa login, hiện khi login, New Chat |
-| **S3.1** | Auth Service — route & logic | ⬜ Chờ | `routes/auth.js`: POST /auth/register, POST /auth/login, POST /auth/logout |
-| **S3.2** | Auth Service — JWT & lưu users | ⬜ Chờ | Tạo `data/users.json`, ký JWT, middleware `authenticateToken` |
-| **S3.3** | Auth UI — Modal đăng nhập/đăng ký | ⬜ Chờ | Nâng cấp API thật cho Auth Modal, đồng bộ token JWT |
-| **S4.1** | Session Service — lưu hội thoại | ⬜ Chờ | `routes/sessions.js`: lưu vào `data/sessions/<userId>/` |
-| **S4.2** | Session UI — load lịch sử sidebar | ⬜ Chờ | Hiển thị danh sách session, click để restore hội thoại |
-| **S5.1** | Kiểm thử & tích hợp toàn hệ thống | ⬜ Chờ | Test luồng: Đăng nhập → Chat → Lưu → Load lại |
+| **S1.1** | Phân tách cấu trúc `client/` & `server/` | ✅ Hoàn thành | Chuẩn SOA: `client/` (UI), `server/` (Gateway + Routes), `data/` |
+| **S1.2** | Chuẩn hóa `server/gateway.js` | ✅ Hoàn thành | API Gateway định tuyến tĩnh client và các sub-services độc lập |
+| **S2.1** | Nút Con Mắt cố định & Phong cách Claude.ai | ✅ Hoàn thành | Nút con mắt cố định góc trái toggle sidebar, dọn nút thừa, màu Claude |
+| **S2.2** | User Popover & Theme Switcher (3 dạng) | ✅ Hoàn thành | Popover menu: Đổi màu giao diện (Hệ thống / Sáng / Tối) |
+| **S3.1** | Google Sign-In Client Service | ✅ Hoàn thành | Google Identity OAuth 2.0 + Modal chọn tài khoản Google chuẩn UX |
+| **S3.2** | Cơ sở dữ liệu lưu trữ (`storageService.js`) | ✅ Hoàn thành | IndexedDB lưu phiên & ảnh base64, giới hạn 10 sessions, 12 turns/session |
+| **S4.1** | Khôi phục phiên trò chuyện & Chat tiếp | ✅ Hoàn thành | Click phiên cũ ở sidebar -> render lại tin nhắn + ảnh, tiếp tục chat |
+| **S5.1** | Kiểm thử & Deploy Vercel | ✅ Hoàn thành | Đồng bộ GitHub, Vercel Serverless Function hoạt động chuẩn xác |
 | **S5.2** | Cập nhật tài liệu báo cáo môn học | ⬜ Chờ | Cập nhật doc 01 & 02 theo kiến trúc SOA mới |

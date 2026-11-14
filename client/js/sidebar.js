@@ -170,11 +170,91 @@ const SidebarController = (() => {
     }
   }
 
+  // Giải mã JWT Token từ Google Identity Services
+  function parseJwt(token) {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+      return JSON.parse(jsonPayload);
+    } catch (e) {
+      console.warn("Lỗi parse JWT:", e);
+      return {};
+    }
+  }
+
+  // Khởi tạo Google Identity Services (GIS) chính thức
+  function initGoogleIdentity() {
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) {
+      // Đợi Google SDK tải xong
+      setTimeout(initGoogleIdentity, 300);
+      return;
+    }
+
+    const clientId = (window.AdvConfig && AdvConfig.getGoogleClientId)
+      ? AdvConfig.getGoogleClientId()
+      : "748430716195-f31bj0as1jrp3qe2t2cl21ah8844osrs.apps.googleusercontent.com";
+
+    try {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => {
+          if (response && response.credential) {
+            const payload = parseJwt(response.credential);
+            completeGoogleSignIn({
+              id: payload.sub || ('google-' + Date.now()),
+              name: payload.name || payload.given_name || 'Người dùng Google',
+              email: payload.email || 'user@gmail.com',
+              picture: payload.picture || null
+            });
+          }
+        },
+        auto_select: false,
+        cancel_on_tap_outside: true
+      });
+
+      // Render nút đăng nhập Google chính thức vào container nếu có
+      const slot = document.getElementById('google-official-btn-slot');
+      if (slot) {
+        slot.innerHTML = '';
+        google.accounts.id.renderButton(slot, {
+          theme: 'outline',
+          size: 'medium',
+          type: 'standard',
+          shape: 'pill',
+          text: 'signin_with',
+          logo_alignment: 'left',
+          width: 220
+        });
+      }
+    } catch (err) {
+      console.warn('[Google GIS]', err);
+    }
+  }
+
   // Đăng nhập bằng Google
   function handleGoogleLogin() {
     closeUserPopover();
 
-    // Mở modal đăng nhập Google
+    // Thử kích hoạt Google One Tap / Google Prompt chính thức trước
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+      try {
+        google.accounts.id.prompt((notification) => {
+          // Nếu Google chặn hiển thị do chưa cấu hình Authorized Origins trên Google Cloud
+          if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+            console.log('[Google GIS] Prompt không hiển thị, mở modal hỗ trợ:', notification.getNotDisplayedReason?.());
+            if (googleAuthModal) googleAuthModal.classList.remove('hidden');
+          }
+        });
+        return;
+      } catch (e) {
+        console.warn('Lỗi gọi google.accounts.id.prompt:', e);
+      }
+    }
+
+    // Fallback: Mở modal chọn tài khoản nếu SDK chưa sẵn sàng
     if (googleAuthModal) {
       googleAuthModal.classList.remove('hidden');
     }
@@ -391,6 +471,9 @@ const SidebarController = (() => {
     // Sự kiện Đăng nhập Google
     btnGoogleLogin?.addEventListener('click', handleGoogleLogin);
     btnLogout?.addEventListener('click', handleLogout);
+
+    // Kích hoạt Google Identity Services
+    initGoogleIdentity();
 
     // Xử lý modal đăng nhập Google
     document.getElementById('btn-close-google-modal')?.addEventListener('click', () => {

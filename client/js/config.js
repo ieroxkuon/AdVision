@@ -36,12 +36,20 @@ const AdvConfig = {
   // Khóa API mặc định hệ thống (phục vụ mục đích demo nghiên cứu)
   DEFAULT_API_KEY: ["AQ", "Ab8RN6KzrZ4IXmVghFLkZfB7BQjXq-cuo5nsJde35fm6u_3CQQ"].join('.'),
 
+  // Google OAuth Client ID chính thức từ Google Cloud Console
+  GOOGLE_CLIENT_ID: "748430716195-f31bj0as1jrp3qe2t2cl21ah8844osrs.apps.googleusercontent.com",
+
   // Các định danh lưu trữ trong LocalStorage
   STORAGE_KEYS: {
     API_KEY: 'GEMINI_API_KEY',
+    GOOGLE_CLIENT_ID: 'ADVISION_GOOGLE_CLIENT_ID',
     USER_NAME: 'ADVISION_USER_NAME',
     USER_INDUSTRY: 'ADVISION_USER_INDUSTRY',
     NAME_VARIATIONS: 'ADVISION_NAME_VARIATIONS'
+  },
+
+  getGoogleClientId() {
+    return localStorage.getItem(this.STORAGE_KEYS.GOOGLE_CLIENT_ID) || this.GOOGLE_CLIENT_ID;
   },
 
   // Lấy API Key khả dụng (ưu tiên key người dùng tự nhập, nếu không dùng key hệ thống)

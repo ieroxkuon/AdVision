@@ -1,11 +1,11 @@
 {
   "framework": null,
-  "outputDirectory": ".",
+  "outputDirectory": "client",
   "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server.js"
+      "destination": "/server/gateway.js"
     }
   ],
   "headers": [

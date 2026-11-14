@@ -18,8 +18,8 @@ const fs      = require('fs');
 
 const router = express.Router();
 
-// --- Cấu hình lưu trữ ---
-const uploadDir = path.join(__dirname, '..', 'uploads');
+// --- Cấu hình lưu trữ (uploads/ nằm ở root) ---
+const uploadDir = path.join(__dirname, '..', '..', 'uploads');
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }

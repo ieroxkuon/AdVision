@@ -1,14 +1,15 @@
 /**
  * =============================================================================
- * ADVISION API GATEWAY — server.js (SOA Architecture v2.0)
+ * ADVISION API GATEWAY — server/gateway.js (SOA Architecture v2.0)
  * =============================================================================
- * File này chỉ đóng vai trò API GATEWAY:
- *   - Khởi động Express server
- *   - Đăng ký middleware dùng chung (JSON parser, static files)
- *   - Mount các Route Service vào đúng đường dẫn
- *
- * Mỗi Service nằm trong routes/ và chịu trách nhiệm một việc duy nhất.
- * Nguyên lý SOA: Loose Coupling, Single Responsibility, Reusability.
+ * Đóng vai trò là API GATEWAY trung tâm của hệ thống:
+ *   - Định tuyến tập trung (Centralized Routing)
+ *   - Phân giải static client assets từ thư mục ../client
+ *   - Phục vụ file upload từ thư mục ../uploads
+ *   - Gắn kết (Mount) các Service độc lập:
+ *       ├─ Health Service  : GET  /api/health
+ *       ├─ Upload Service  : POST /api/upload
+ *       ├─ Analyze Service : POST /api/analyze & POST /api/analyze/chat
  * =============================================================================
  */
 
@@ -18,50 +19,54 @@ const path    = require('path');
 const app  = express();
 const PORT = process.env.PORT || 3000;
 
+// Đường dẫn tới các tầng trong kiến trúc SOA
+const CLIENT_DIR = path.join(__dirname, '..', 'client');
+const UPLOAD_DIR = path.join(__dirname, '..', 'uploads');
+const DATA_DIR   = path.join(__dirname, '..', 'data');
+
 // ---------------------------------------------------------------------------
 // MIDDLEWARE DÙNG CHUNG
 // ---------------------------------------------------------------------------
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(__dirname));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Phục vụ Client Presentation Tier
+app.use(express.static(CLIENT_DIR));
+app.use('/uploads', express.static(UPLOAD_DIR));
+app.use('/data', express.static(DATA_DIR));
 
 // ---------------------------------------------------------------------------
-// MOUNT CÁC ROUTE SERVICE (SOA — mỗi route = 1 service độc lập)
+// MOUNT CÁC ROUTE SERVICES (SOA Micro-services)
 // ---------------------------------------------------------------------------
-const healthRoute  = require('./routes/health');   // Health-check Service
+const healthRoute  = require('./routes/health');   // Health Service
 const uploadRoute  = require('./routes/upload');   // Upload Service
 const analyzeRoute = require('./routes/analyze');  // AI Analysis Service
-// Các service sẽ được thêm sau:
-// const authRoute    = require('./routes/auth');   // Auth Service (S3.x)
-// const sessionRoute = require('./routes/sessions'); // Session Service (S4.x)
 
 app.use('/api/health',  healthRoute);
 app.use('/api/upload',  uploadRoute);
 app.use('/api/analyze', analyzeRoute);
-// app.use('/api/auth',    authRoute);
-// app.use('/api/sessions', sessionRoute);
 
 // ---------------------------------------------------------------------------
 // GLOBAL ERROR HANDLER
 // ---------------------------------------------------------------------------
 app.use((err, req, res, next) => {
-  console.error('[Gateway Error]', err.message);
-  res.status(500).json({ error: 'Lỗi server nội bộ', detail: err.message });
+  console.error('[API Gateway Error]', err.message);
+  res.status(500).json({ error: 'Lỗi API Gateway nội bộ', detail: err.message });
 });
 
 // ---------------------------------------------------------------------------
-// KHỞI ĐỘNG SERVER (khi chạy local)
+// KHỞI ĐỘNG SERVER (Local development)
 // ---------------------------------------------------------------------------
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   app.listen(PORT, () => {
     console.log(`[🚀] AdVision SOA Gateway đang chạy tại: http://localhost:${PORT}`);
-    console.log(`     ├─ Health  : GET  /api/health`);
-    console.log(`     ├─ Upload  : POST /api/upload`);
-    console.log(`     ├─ Analyze : POST /api/analyze`);
-    console.log(`     └─ Chat    : POST /api/analyze/chat`);
+    console.log(`     ├─ Client UI: ${CLIENT_DIR}`);
+    console.log(`     ├─ Health   : GET  /api/health`);
+    console.log(`     ├─ Upload   : POST /api/upload`);
+    console.log(`     ├─ Analyze  : POST /api/analyze`);
+    console.log(`     └─ Chat     : POST /api/analyze/chat`);
   });
 }
 
-// Export cho môi trường Vercel Serverless
+// Export cho môi trường Vercel Serverless Function
 module.exports = app;

@@ -2,14 +2,14 @@
   "name": "ai-ad-image-analyzer-web",
   "version": "1.0.0",
   "description": "> **Hệ Thống Cố Vấn Thẩm Định & Đánh Giá Tiêu Chuẩn Hình Ảnh Quảng Cáo Ứng Dụng AI Agent Multimodal**",
-  "main": "server.js",
+  "main": "server/gateway.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "echo \"Static web deployment ready\"",
-    "start": "node server.js"
+    "start": "node server/gateway.js"
   },
   "repository": {
     "type": "git",

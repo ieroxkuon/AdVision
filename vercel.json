@@ -2,6 +2,12 @@
   "framework": null,
   "outputDirectory": ".",
   "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/server.js"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

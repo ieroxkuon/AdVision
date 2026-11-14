@@ -748,7 +748,20 @@ const AppController = {
 
         await UIController.streamLines(lines, quickActions);
         // Cập nhật giai đoạn sau khi hiển thị overview
-        if (isLast) this.state.conversationStage = 'image_overview';
+        if (isLast) {
+          this.state.conversationStage = 'image_overview';
+          try {
+            if (window.SidebarController) {
+              const titleName = (sentImages[0] && sentImages[0].fileName) ? sentImages[0].fileName : 'Thẩm định ảnh quảng cáo';
+              const industry = this.state.userIndustry ? ` (${this.state.userIndustry})` : '';
+              window.SidebarController.addSession({
+                id: 'sess-' + Date.now(),
+                title: titleName + industry,
+                date: 'Hôm nay'
+              });
+            }
+          } catch(e) {}
+        }
 
         if (!isLast) {
           await UIController.delay(700);

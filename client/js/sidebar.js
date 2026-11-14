@@ -195,7 +195,7 @@ const SidebarController = (() => {
 
     const clientId = (window.AdvConfig && AdvConfig.getGoogleClientId)
       ? AdvConfig.getGoogleClientId()
-      : "748430716195-f31bj0as1jrp3qe2t2cl21ah8844osrs.apps.googleusercontent.com";
+      : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
     try {
       google.accounts.id.initialize({
@@ -221,13 +221,23 @@ const SidebarController = (() => {
         slot.innerHTML = '';
         google.accounts.id.renderButton(slot, {
           theme: 'outline',
-          size: 'medium',
+          size: 'large',
           type: 'standard',
-          shape: 'pill',
+          shape: 'rectangular',
           text: 'signin_with',
           logo_alignment: 'left',
-          width: 220
+          width: 230
         });
+
+        // Khi nút Google chính thức đã render, ẩn nút dự phòng để giao diện cực gọn
+        if (btnGoogleLogin) {
+          btnGoogleLogin.classList.add('hidden');
+        }
+      }
+
+      // Kích hoạt Google One-Tap nếu chưa đăng nhập
+      if (!_currentUser) {
+        google.accounts.id.prompt();
       }
     } catch (err) {
       console.warn('[Google GIS]', err);

@@ -152,28 +152,10 @@ const AppController = {
       });
     }
 
-    // Sự kiện đặt lại cuộc trò chuyện từ đầu
+    // Sự kiện đặt lại cuộc trò chuyện từ đầu (Bắt đầu phiên mới)
     if (btnResetChat) {
       btnResetChat.addEventListener('click', () => {
-        if (confirm('Bạn có muốn bắt đầu lại cuộc trò chuyện không?')) {
-          this.state.userName = "";
-          this.state.userIndustry = "";
-          this.state.userPlatform = "";
-          this.state.campaignGoal = "";
-          this.state.nameVariations = [];
-          this.state.activeImageData = null;
-          this.state.conversationHistory = [];
-          this.state.conversationStage = 'idle';
-          this.state.lastFailedRequest = null;
-          localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_NAME);
-          localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY);
-          localStorage.removeItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS);
-          localStorage.removeItem('adv_user_platform');
-          localStorage.removeItem('adv_campaign_goal');
-          this.clearAllAttachments();
-          this.updateSystemStatus();
-          this.playInitialGreeting();
-        }
+        this.startNewChat();
       });
     }
 
@@ -866,6 +848,42 @@ const AppController = {
           });
         }
       } catch (e) {}
+    }
+  },
+
+  // Bắt đầu một phiên trò chuyện mới (New Chat - phong cách Claude.ai / ChatGPT)
+  startNewChat() {
+    this.state.currentSessionId = 'sess-' + Date.now();
+    this.state.conversationHistory = [];
+    this.state.activeImageData = null;
+    this.state.attachedImages = [];
+    this.state.lastFailedRequest = null;
+    this.clearAllAttachments();
+
+    // Bỏ chọn highlight ở sidebar
+    document.querySelectorAll('.sidebar-session-item').forEach(el => {
+      el.classList.remove('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
+    });
+
+    // Xóa sạch khung chat
+    if (UIController.elements.chatContainer) {
+      UIController.elements.chatContainer.innerHTML = '';
+    }
+
+    const currentUser = window.SidebarController?.getCurrentUser();
+    if (currentUser) {
+      this.state.userName = currentUser.name || "";
+      this.state.conversationStage = this.state.userIndustry ? 'awaiting_image' : 'onboarding';
+      const callName = (window.PersonaPrompt && PersonaPrompt.getDynamicCallName) 
+        ? PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName)
+        : (this.state.userName || "bạn");
+      
+      const welcomeMsg = `Chào ${callName}, phiên thẩm định mới đã sẵn sàng! Bạn có thể nhấn 📎 để tải ảnh quảng cáo hoặc nhập câu hỏi cho mình nhé.`;
+      UIController.streamLines([welcomeMsg]);
+      this.updateSystemStatus();
+    } else {
+      this.state.conversationStage = 'idle';
+      this.playInitialGreeting();
     }
   },
 

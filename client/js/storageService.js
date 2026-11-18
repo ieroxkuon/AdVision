@@ -54,11 +54,16 @@ const StorageService = (() => {
   // ---------------------------------------------------------------------------
 
   /**
-   * Lưu hoặc cập nhật phiên trò chuyện
+   * Lưu hoặc cập nhật phiên trò chuyện (Chỉ lưu với người dùng đã đăng nhập)
    * @param {Object} session { id, title, userId, activeImageData, conversationHistory, stage, updatedAt }
    */
   async function saveSession(session) {
     try {
+      if (!session || !session.userId || session.userId === 'guest') {
+        // Không lưu phiên của khách (Guest)
+        return null;
+      }
+
       const db = await getDb();
 
       // Giới hạn số lượng tin nhắn trong phiên để tránh tràn context token
@@ -70,7 +75,7 @@ const StorageService = (() => {
       const record = {
         id: session.id || ('sess-' + Date.now()),
         title: session.title || 'Thẩm định hình ảnh quảng cáo',
-        userId: session.userId || 'guest',
+        userId: session.userId,
         activeImageData: session.activeImageData || null,
         conversationHistory: trimmedHistory,
         stage: session.stage || 'image_overview',
@@ -86,21 +91,25 @@ const StorageService = (() => {
         tx.onerror = () => reject(tx.error);
       });
 
-      // Tự động dọn dẹp các phiên cũ nếu vượt quá MAX_SESSIONS
+      // Tự động dọn dẹp các phiên cũ nếu vượt quá MAX_SESSIONS (10 phiên)
       await cleanupOldSessions(record.userId);
 
       return record;
     } catch (err) {
-      console.warn('[StorageService] Không thể lưu IndexedDB, fallback localStorage:', err);
+      console.warn('[StorageService] Không thể lưu IndexedDB:', err);
       return null;
     }
   }
 
   /**
    * Lấy danh sách phiên của người dùng (sắp xếp mới nhất lên đầu)
+   * @param {string} userId ID của người dùng
+   * @param {number} limit Giới hạn số lượng (mặc định 10 phiên, 0 là lấy hết)
    */
-  async function getSessions(userId = 'guest') {
+  async function getSessions(userId, limit = MAX_SESSIONS) {
     try {
+      if (!userId || userId === 'guest') return [];
+
       const db = await getDb();
       return new Promise((resolve) => {
         const tx = db.transaction(STORE_SESSIONS, 'readonly');
@@ -110,11 +119,15 @@ const StorageService = (() => {
         request.onsuccess = () => {
           let list = request.result || [];
           if (userId && userId !== 'all') {
-            list = list.filter(item => item.userId === userId || (!item.userId && userId === 'guest'));
+            list = list.filter(item => item.userId === userId);
           }
           // Sắp xếp mới nhất lên trước
           list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
-          resolve(list.slice(0, MAX_SESSIONS));
+          if (limit && limit > 0) {
+            resolve(list.slice(0, limit));
+          } else {
+            resolve(list);
+          }
         };
 
         request.onerror = () => resolve([]);
@@ -160,13 +173,13 @@ const StorageService = (() => {
   }
 
   /**
-   * Dọn dẹp phiên cũ khi vượt quá giới hạn
+   * Dọn dẹp phiên cũ khi vượt quá giới hạn (Chỉ giữ đúng 10 phiên mới nhất)
    */
   async function cleanupOldSessions(userId) {
     try {
-      const sessions = await getSessions(userId);
-      if (sessions.length > MAX_SESSIONS) {
-        const toDelete = sessions.slice(MAX_SESSIONS);
+      const allSessions = await getSessions(userId, 0); // Lấy toàn bộ không giới hạn
+      if (allSessions.length > MAX_SESSIONS) {
+        const toDelete = allSessions.slice(MAX_SESSIONS);
         const db = await getDb();
         const tx = db.transaction(STORE_SESSIONS, 'readwrite');
         const store = tx.objectStore(STORE_SESSIONS);

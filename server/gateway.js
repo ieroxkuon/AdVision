@@ -46,6 +46,11 @@ app.use('/api/health',  healthRoute);
 app.use('/api/upload',  uploadRoute);
 app.use('/api/analyze', analyzeRoute);
 
+// Serve the SPA entry point for client-side routes.
+app.get(['/c/:sessionId', '/rules', '/settings/api', '/account'], (req, res) => {
+  res.sendFile('index.html', { root: CLIENT_DIR });
+});
+
 // ---------------------------------------------------------------------------
 // GLOBAL ERROR HANDLER
 // ---------------------------------------------------------------------------

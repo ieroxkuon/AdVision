@@ -5,3 +5,5 @@ credentials/
 Thumbs.db
 __pycache__/
 *.pyc
+.vercel
+.env*

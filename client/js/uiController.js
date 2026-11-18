@@ -33,7 +33,6 @@ const UIController = {
     btnDoneDocsModal: document.getElementById('btn-done-docs-modal'),
     docsRulesList: document.getElementById('docs-rules-list'),
 
-    btnResetChat: document.getElementById('btn-reset-chat'),
     userInfoBadge: document.getElementById('user-info-badge'),
     badgeUserName: document.getElementById('badge-user-name'),
     badgeIndustryContainer: document.getElementById('badge-industry-container'),
@@ -566,6 +565,12 @@ const UIController = {
       .trim();
   },
 
+  applyRoute(route = window.AppRouter.getCurrentRoute()) {
+    const { docsModal, apiModal } = this.elements;
+    if (docsModal) docsModal.classList.toggle('hidden', route.name !== 'rules');
+    if (apiModal) apiModal.classList.toggle('hidden', route.name !== 'apiSettings');
+  },
+
   // Khởi tạo các sự kiện Modal
   initModals() {
     const {
@@ -577,12 +582,15 @@ const UIController = {
       docsRulesList.innerHTML = window.RulesService.renderToHtml();
     }
 
-    if (btnDocsModal) btnDocsModal.addEventListener('click', () => docsModal.classList.remove('hidden'));
-    if (btnCloseDocsModal) btnCloseDocsModal.addEventListener('click', () => docsModal.classList.add('hidden'));
-    if (btnDoneDocsModal) btnDoneDocsModal.addEventListener('click', () => docsModal.classList.add('hidden'));
+    if (btnDocsModal) btnDocsModal.addEventListener('click', () => window.AppRouter.navigate('/rules'));
+    if (btnCloseDocsModal) btnCloseDocsModal.addEventListener('click', () => window.AppRouter.navigate('/', { replace: true }));
+    if (btnDoneDocsModal) btnDoneDocsModal.addEventListener('click', () => window.AppRouter.navigate('/', { replace: true }));
 
-    if (btnApiKeyModal) btnApiKeyModal.addEventListener('click', () => apiModal.classList.remove('hidden'));
-    if (btnCloseModal) btnCloseModal.addEventListener('click', () => apiModal.classList.add('hidden'));
+    if (btnApiKeyModal) btnApiKeyModal.addEventListener('click', () => window.AppRouter.navigate('/settings/api'));
+    if (btnCloseModal) btnCloseModal.addEventListener('click', () => window.AppRouter.navigate('/', { replace: true }));
+
+    window.addEventListener('app:routechange', (event) => this.applyRoute(event.detail.route));
+    this.applyRoute();
   }
 };
 

@@ -51,6 +51,7 @@ const AppController = {
     try {
       const currentUser = (window.SidebarController && window.SidebarController.getCurrentUser()) 
         || (window.StorageService ? window.StorageService.getCurrentUser() : null);
+      const route = window.AppRouter.getCurrentRoute();
 
       // NẾU LÀ GUEST (CHƯA ĐĂNG NHẬP): Luôn làm mới hoàn toàn khi reload (F5) trang web!
       // Giúp hàng trăm Guest cùng dùng website hoàn toàn độc lập, không vướng rác cũ.
@@ -74,29 +75,28 @@ const AppController = {
           localStorage.removeItem('adv_campaign_goal');
         } catch(e) {}
 
-        UIController.initModals();
-        this.bindEvents();
-        this.updateSystemStatus();
-        this.playInitialGreeting();
-        return;
+      } else {
+        this.state.userName = currentUser.name || "";
       }
 
-      // NẾU ĐÃ ĐĂNG NHẬP:
-      this.state.userName = currentUser.name || "";
       UIController.initModals();
       this.bindEvents();
       this.updateSystemStatus();
 
-      // Nếu không có tham số ?c= trên URL thì mới hiển thị lời chào mừng
-      const params = new URLSearchParams(window.location.search);
-      if (!params.get('c')) {
-        const callName = (window.PersonaPrompt && PersonaPrompt.getDynamicCallName) 
-          ? PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName)
-          : (this.state.userName || "bạn");
+      if (route.name !== 'chat') {
+        if (!currentUser) {
+          this.playInitialGreeting();
+        } else {
+          const callName = (window.PersonaPrompt && PersonaPrompt.getDynamicCallName)
+            ? PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName)
+            : (this.state.userName || "bạn");
 
-        const welcomeBack = `Chào ${callName}, rất vui được gặp lại bạn! Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không — hãy nhấn 📎 để tải ảnh lên nhé!`;
-        UIController.streamLines([welcomeBack]);
+          const welcomeBack = `Chào ${callName}, phiên thẩm định mới đã sẵn sàng! Bạn có thể nhấn 📎 để tải ảnh quảng cáo hoặc nhập câu hỏi cho mình nhé.`;
+          UIController.streamLines([welcomeBack]);
+        }
       }
+
+      window.AppRouter.emitCurrent();
     } catch (err) {
       console.error("AdVision Init Error:", err);
       this.playInitialGreeting();
@@ -133,7 +133,7 @@ const AppController = {
 
   // Đăng ký các sự kiện tương tác
   bindEvents() {
-    const { chatForm, btnAttachImage, fileInput, btnClearAllAttachments, btnSaveKey, inputApiKey, apiModal, btnResetChat } = UIController.elements;
+    const { chatForm, btnAttachImage, fileInput, btnClearAllAttachments, btnSaveKey, inputApiKey, apiModal } = UIController.elements;
 
     // Sự kiện đính kèm hình ảnh
     if (btnAttachImage && fileInput) {
@@ -157,13 +157,6 @@ const AppController = {
         if (apiModal) apiModal.classList.add('hidden');
         this.updateSystemStatus();
         alert('Đã lưu API Key thành công! Hệ thống đã sẵn sàng kết nối AI.');
-      });
-    }
-
-    // Sự kiện đặt lại cuộc trò chuyện từ đầu (Bắt đầu phiên mới)
-    if (btnResetChat) {
-      btnResetChat.addEventListener('click', () => {
-        this.startNewChat();
       });
     }
 
@@ -913,20 +906,22 @@ const AppController = {
     this.state.activeImageData = null;
     this.state.attachedImages = [];
     this.state.lastFailedRequest = null;
+    this.state.userIndustry = '';
+    this.state.userPlatform = '';
+    this.state.campaignGoal = '';
     this.clearAllAttachments();
+    if (UIController.elements.chatInput) UIController.elements.chatInput.value = '';
+    localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY);
+    localStorage.removeItem('adv_user_platform');
+    localStorage.removeItem('adv_campaign_goal');
 
     // Bỏ chọn highlight ở sidebar
     document.querySelectorAll('.sidebar-session-item').forEach(el => {
       el.classList.remove('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
     });
 
-    // Xóa tham số ?c= trên URL để URL quay về trang chủ sạch sẽ
     if (updateUrl) {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.delete('c');
-        window.history.pushState({}, '', url.pathname);
-      } catch (e) {}
+      window.AppRouter.navigate('/', { skipNewChat: true });
     }
 
     // Xóa sạch khung chat

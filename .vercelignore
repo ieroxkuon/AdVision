@@ -1,5 +1,7 @@
 scripts/
 credentials/
+.env
+.env.*
 docs/
 trainingdocs/
 server.js

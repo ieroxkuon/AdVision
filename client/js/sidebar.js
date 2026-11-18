@@ -20,6 +20,7 @@ const SidebarController = (() => {
   let _currentThemeMode = localStorage.getItem('adv_theme_mode') || 'system';
   let _sessions = [];
   let _systemThemeListenerAttached = false;
+  let _activeRoute = null;
 
   // DOM Elements cache
   let eyeBtn = null;
@@ -36,6 +37,9 @@ const SidebarController = (() => {
   let btnGoogleLogin = null;
   let btnLogout = null;
   let googleAuthModal = null;
+  let logoutConfirmModal = null;
+  let btnCancelLogout = null;
+  let btnConfirmLogout = null;
 
   // ---------------------------------------------------------------------------
   // 1. QUẢN LÝ THEME GIAO DIỆN (SYSTEM / LIGHT / DARK - PHONG CÁCH CLAUDE.AI)
@@ -71,11 +75,6 @@ const SidebarController = (() => {
 
     // Cập nhật giao diện nút chọn theme trong popover
     updateThemeSelectorUi(mode);
-
-    // Cập nhật lại màu nút Google Sign-In nếu đang ở chế độ khách
-    if (!_currentUser) {
-      renderGoogleSignInButton();
-    }
   }
 
   function updateThemeSelectorUi(activeMode) {
@@ -122,18 +121,35 @@ const SidebarController = (() => {
   function toggleUserPopover(e) {
     if (e) e.stopPropagation();
     if (!userPopover) return;
-    const willOpen = userPopover.classList.contains('hidden');
-    userPopover.classList.toggle('hidden');
-    if (willOpen && !_currentUser) {
-      // Khi popover mở ra, đảm bảo nút Google hiển thị đúng theme và kích thước
-      renderGoogleSignInButton();
+    if (userPopover.classList.contains('hidden')) {
+      window.AppRouter.navigate('/account');
+    } else {
+      closeUserPopover();
+    }
+  }
+
+  function hideUserPopover() {
+    if (userPopover && !userPopover.classList.contains('hidden')) {
+      userPopover.classList.add('hidden');
     }
   }
 
   function closeUserPopover() {
-    if (userPopover && !userPopover.classList.contains('hidden')) {
-      userPopover.classList.add('hidden');
+    hideUserPopover();
+    if (window.AppRouter.getCurrentRoute().name === 'account') {
+      window.AppRouter.navigate('/', { replace: true, skipNewChat: true });
     }
+  }
+
+  function openLogoutConfirm() {
+    closeUserPopover();
+    logoutConfirmModal?.classList.remove('hidden');
+    btnCancelLogout?.focus();
+  }
+
+  function closeLogoutConfirm() {
+    if (logoutConfirmModal) logoutConfirmModal.classList.add('hidden');
+    btnLogout?.focus();
   }
 
   // ---------------------------------------------------------------------------
@@ -205,7 +221,7 @@ const SidebarController = (() => {
       });
       const userInfo = await resp.json();
       if (userInfo && (userInfo.email || userInfo.sub)) {
-        completeGoogleSignIn({
+        await completeGoogleSignIn({
           id: userInfo.sub || ('google-' + Date.now()),
           name: userInfo.name || userInfo.given_name || 'Người dùng Google',
           email: userInfo.email || 'user@gmail.com',
@@ -237,7 +253,7 @@ const SidebarController = (() => {
           scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
-              fetchGoogleUserInfo(tokenResponse.access_token);
+              await fetchGoogleUserInfo(tokenResponse.access_token);
             }
           }
         });
@@ -272,13 +288,22 @@ const SidebarController = (() => {
       : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-    const redirectUri = window.location.origin + window.location.pathname;
+    const redirectUri = new URL('/', window.location.origin).toString();
+    const redirectToGoogle = () => {
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'token',
+        scope: 'openid profile email',
+        prompt: 'select_account'
+      });
+      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    };
 
     // 1. TRÊN DESKTOP: Chuyển hướng trực tiếp 100% đến trang Chọn tài khoản chính thức của Google
     // (Mở đúng trang accounts.google.com/v3/signin/accountchooser hiển thị danh sách tài khoản như Zerotier)
     if (!isMobile) {
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20profile%20email&prompt=select_account`;
-      window.location.href = authUrl;
+      redirectToGoogle();
       return;
     }
 
@@ -293,12 +318,11 @@ const SidebarController = (() => {
     }
 
     // Dự phòng mobile: chuyển hướng trực tiếp
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20profile%20email&prompt=select_account`;
-    window.location.href = authUrl;
+    redirectToGoogle();
   }
 
   // Hoàn tất xác thực Google (nhận payload từ Google OAuth hoặc mô phỏng)
-  function completeGoogleSignIn(userProfile) {
+  async function completeGoogleSignIn(userProfile) {
     _currentUser = {
       id: userProfile.id || ('google-' + Date.now()),
       name: userProfile.name || 'Người dùng Google',
@@ -309,7 +333,7 @@ const SidebarController = (() => {
     };
 
     if (window.StorageService) {
-      window.StorageService.saveUser(_currentUser);
+      await window.StorageService.saveUser(_currentUser);
     }
 
     // Đồng bộ tên với AdVision để Hoàng An xưng hô đúng tên
@@ -322,25 +346,34 @@ const SidebarController = (() => {
       }
     } catch (e) {}
 
-    renderUserState();
-
-    if (googleAuthModal) googleAuthModal.classList.add('hidden');
-
-    // Chào mừng
-    if (window.UiController?.showSystemNotice) {
-      window.UiController.showSystemNotice(`Đã đăng nhập thành công: ${_currentUser.name}`);
-    }
+    window.location.replace(new URL('/', window.location.origin).toString());
   }
 
   // Đăng xuất
   function handleLogout() {
+    closeLogoutConfirm();
     closeUserPopover();
     _currentUser = null;
     _sessions = [];
     if (window.StorageService) {
       window.StorageService.clearCurrentUser();
     }
+    localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_NAME);
+    localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY);
+    localStorage.removeItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS);
+    localStorage.removeItem('adv_user_platform');
+    localStorage.removeItem('adv_campaign_goal');
+
+    if (window.AppController?.state) {
+      window.AppController.state.userName = '';
+      window.AppController.state.userIndustry = '';
+      window.AppController.state.userPlatform = '';
+      window.AppController.state.nameVariations = [];
+      window.AppController.state.campaignGoal = '';
+    }
+
     renderUserState();
+    window.location.replace(new URL('/', window.location.origin).toString());
   }
 
   // ---------------------------------------------------------------------------
@@ -407,7 +440,7 @@ const SidebarController = (() => {
     });
   }
 
-  // Chọn 1 phiên để chat tiếp (Cập nhật URL ?c=... giống hệt ChatGPT & Claude.ai)
+  // Chọn 1 phiên để chat tiếp.
   async function selectSession(session, updateUrl = true) {
     if (!session) return;
 
@@ -418,13 +451,9 @@ const SidebarController = (() => {
     const activeEl = sessionList?.querySelector(`[data-session-id="${session.id}"]`);
     if (activeEl) activeEl.classList.add('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
 
-    // Cập nhật URL (?c=sess-xxx) mà không reload trang
     if (updateUrl) {
-      try {
-        const url = new URL(window.location.href);
-        url.searchParams.set('c', session.id);
-        window.history.pushState({ sessionId: session.id }, '', url.toString());
-      } catch (e) {}
+      window.AppRouter.navigate(`/c/${encodeURIComponent(session.id)}`);
+      return;
     }
 
     // Chuyển sang AppController để khôi phục tin nhắn & ảnh vào khung chat
@@ -433,25 +462,50 @@ const SidebarController = (() => {
     }
   }
 
-  // Khôi phục phiên chat từ tham số URL (?c=sess-xxx) khi vừa mở web
-  async function checkUrlSessionOnLoad() {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const sessionId = params.get('c');
-      if (sessionId && _currentUser && window.StorageService) {
-        const sess = await window.StorageService.getSessionById(sessionId);
-        if (sess) {
-          selectSession(sess, false);
-          return;
-        }
+  async function handleRouteChange(event) {
+    const { route, state = {} } = event.detail;
+    const previousRoute = _activeRoute;
+    _activeRoute = route;
+
+    if (route.name === 'notFound') {
+      window.AppRouter.navigate('/', { replace: true, skipNewChat: true });
+      return;
+    }
+
+    if (route.name === 'account') {
+      userPopover?.classList.remove('hidden');
+    } else {
+      hideUserPopover();
+    }
+
+    if (route.name === 'chat') {
+      if (!_currentUser || !window.StorageService || !route.sessionId) {
+        window.AppRouter.navigate('/', { replace: true, skipNewChat: true });
+        window.AppController?.startNewChat(false);
+        return;
       }
-      if (sessionId && !_currentUser) {
-        // Chưa đăng nhập thì xóa param ?c= trên URL
-        const url = new URL(window.location.href);
-        url.searchParams.delete('c');
-        window.history.replaceState({}, '', url.pathname);
+
+      const session = await window.StorageService.getSessionById(route.sessionId);
+      const currentRoute = window.AppRouter.getCurrentRoute();
+      if (currentRoute.name !== 'chat' || currentRoute.sessionId !== route.sessionId) return;
+
+      if (!session || session.userId !== _currentUser.id) {
+        window.AppRouter.navigate('/', { replace: true, skipNewChat: true });
+        window.AppController?.startNewChat(false);
+        return;
       }
-    } catch (e) {}
+
+      if (route.legacy) {
+        window.AppRouter.navigate(`/c/${encodeURIComponent(session.id)}`, { replace: true, skipNewChat: true });
+        return;
+      }
+      selectSession(session, false);
+      return;
+    }
+
+    if (previousRoute?.name === 'chat' && route.name === 'home' && _currentUser && !state.skipNewChat) {
+      window.AppController?.startNewChat(false);
+    }
   }
 
   // Thêm hoặc cập nhật session (CHỈ LƯU VỚI NGƯỜI ĐÃ ĐĂNG NHẬP)
@@ -496,6 +550,9 @@ const SidebarController = (() => {
     btnGoogleLogin = document.getElementById('btn-google-login');
     btnLogout = document.getElementById('btn-logout');
     googleAuthModal = document.getElementById('google-auth-modal');
+    logoutConfirmModal = document.getElementById('logout-confirm-modal');
+    btnCancelLogout = document.getElementById('btn-cancel-logout');
+    btnConfirmLogout = document.getElementById('btn-confirm-logout');
 
     themeBtns = {
       system: document.getElementById('theme-btn-system'),
@@ -527,11 +584,12 @@ const SidebarController = (() => {
 
     // Sự kiện Nút New Chat (Tương tự Claude & ChatGPT)
     document.getElementById('btn-new-chat-sidebar')?.addEventListener('click', () => {
-      if (window.AppController && typeof window.AppController.startNewChat === 'function') {
-        window.AppController.startNewChat();
-      } else {
-        document.getElementById('btn-reset-chat')?.click();
-      }
+      if (!window.confirm('Bạn có muốn bắt đầu lại cuộc trò chuyện và nhập lại thông tin từ đầu không?')) return;
+      window.AppController?.startNewChat();
+    });
+
+    window.addEventListener('app:routechange', (event) => {
+      void handleRouteChange(event);
     });
 
     // Sự kiện User Popover
@@ -550,29 +608,20 @@ const SidebarController = (() => {
 
     // Sự kiện Đăng nhập Google
     btnGoogleLogin?.addEventListener('click', handleGoogleLogin);
-    btnLogout?.addEventListener('click', handleLogout);
-
-    // Kích hoạt Google Identity Services (cho mobile)
-    initGoogleIdentity();
-
-    // Lắng nghe nút Back / Forward trên trình duyệt để chuyển đổi đoạn chat theo URL
-    window.addEventListener('popstate', async (e) => {
-      const params = new URLSearchParams(window.location.search);
-      const sessionId = params.get('c');
-      if (sessionId && _currentUser && window.StorageService) {
-        const sess = await window.StorageService.getSessionById(sessionId);
-        if (sess) {
-          selectSession(sess, false);
-          return;
-        }
-      }
-      if (!sessionId && window.AppController) {
-        window.AppController.startNewChat(false);
+    btnLogout?.addEventListener('click', openLogoutConfirm);
+    btnCancelLogout?.addEventListener('click', closeLogoutConfirm);
+    btnConfirmLogout?.addEventListener('click', handleLogout);
+    logoutConfirmModal?.addEventListener('click', (e) => {
+      if (e.target === logoutConfirmModal) closeLogoutConfirm();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && logoutConfirmModal && !logoutConfirmModal.classList.contains('hidden')) {
+        closeLogoutConfirm();
       }
     });
 
-    // Khôi phục đoạn chat từ URL (?c=sess-xxx) khi vừa mở trang web
-    setTimeout(checkUrlSessionOnLoad, 250);
+    // Kích hoạt Google Identity Services (cho mobile)
+    initGoogleIdentity();
 
     // Xử lý modal đăng nhập Google
     document.getElementById('btn-close-google-modal')?.addEventListener('click', () => {

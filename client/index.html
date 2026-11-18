@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base href="/">
   <title>AdVision - Nguyễn Hoàng An | Cố vấn Thẩm định Hình ảnh Quảng cáo</title>
   
   <!-- Google Identity Services SDK chính thức -->
@@ -279,10 +280,6 @@
             <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
           </button>
 
-          <!-- Nút làm mới đoạn chat -->
-          <button id="btn-reset-chat" class="w-8 h-8 rounded-xl text-claudeMuted hover:text-claudeText dark:hover:text-claudeDarkText hover:bg-claudeBorder/50 dark:hover:bg-claudeDarkBorder/50 flex items-center justify-center transition-colors" title="Bắt đầu lại cuộc trò chuyện">
-            <i class="fa-solid fa-rotate-right text-xs"></i>
-          </button>
         </div>
       </header>
 
@@ -396,6 +393,20 @@
     </div>
   </div>
 
+  <!-- LOGOUT CONFIRMATION MODAL -->
+  <div id="logout-confirm-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="logout-confirm-title" aria-describedby="logout-confirm-description">
+    <div class="bg-white dark:bg-[#20201D] rounded-2xl max-w-sm w-full p-5 space-y-4 shadow-2xl border border-claudeBorder dark:border-claudeDarkBorder">
+      <div>
+        <h3 id="logout-confirm-title" class="text-sm font-bold text-claudeText dark:text-claudeDarkText">Xác nhận đăng xuất</h3>
+        <p id="logout-confirm-description" class="text-xs text-claudeMuted dark:text-claudeDarkMuted mt-2">Bạn có chắc muốn đăng xuất khỏi tài khoản Google không?</p>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button id="btn-cancel-logout" class="px-3 py-2 rounded-xl border border-claudeBorder dark:border-claudeDarkBorder text-claudeText dark:text-claudeDarkText text-xs font-semibold hover:bg-claudeSidebar dark:hover:bg-[#252522]">Hủy</button>
+        <button id="btn-confirm-logout" class="px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold">Đăng xuất</button>
+      </div>
+    </div>
+  </div>
+
   <!-- MODULES ARCHITECTURE -->
   <script src="js/config.js"></script>
   <script src="js/storageService.js"></script>
@@ -404,6 +415,7 @@
   <script src="js/personaPrompt.js"></script>
   <script src="js/redesignGenerator.js"></script>
   <script src="js/apiService.js"></script>
+  <script src="js/router.js"></script>
   <script src="js/uiController.js"></script>
   <script src="js/sidebar.js"></script>
   <script src="js/app.js"></script>

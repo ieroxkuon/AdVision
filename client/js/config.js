@@ -33,8 +33,8 @@ const AdvConfig = {
   OPENAI_API_URL: 'https://api.openai.com/v1/chat/completions',
   OPENAI_MAX_TOKENS: 2500,
 
-  // Khóa API mặc định hệ thống (phục vụ mục đích demo nghiên cứu)
-  DEFAULT_API_KEY: ["AQ", "Ab8RN6KzrZ4IXmVghFLkZfB7BQjXq-cuo5nsJde35fm6u_3CQQ"].join('.'),
+  // Không nhúng API key trong mã client công khai.
+  DEFAULT_API_KEY: '',
 
   // Google OAuth Client ID chính thức từ Google Cloud Console (Loại Web application)
   GOOGLE_CLIENT_ID: "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com",

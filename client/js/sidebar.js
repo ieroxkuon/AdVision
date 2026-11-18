@@ -154,8 +154,6 @@ const SidebarController = (() => {
       }
 
       // Ẩn nút đăng nhập Google, hiện nút Đăng xuất
-      const googleSlot = document.getElementById('google-signin-btn-container');
-      if (googleSlot) googleSlot.classList.add('hidden');
       if (btnGoogleLogin) btnGoogleLogin.classList.add('hidden');
       if (btnLogout) btnLogout.classList.remove('hidden');
 
@@ -173,56 +171,16 @@ const SidebarController = (() => {
         userAvatar.innerHTML = '<i class="fa-regular fa-user text-xs"></i>';
       }
 
+      // Hiện duy nhất 1 nút Đăng nhập bằng Google chuẩn Claude, ẩn nút Đăng xuất
+      if (btnGoogleLogin) btnGoogleLogin.classList.remove('hidden');
       if (btnLogout) btnLogout.classList.add('hidden');
 
       // Ẩn hoàn toàn thanh lịch sử trò chuyện khi chưa đăng nhập
       if (historySection) historySection.classList.add('hidden');
-
-      // Hiển thị nút đăng nhập Google
-      renderGoogleSignInButton();
     }
   }
 
   let _tokenClient = null;
-
-  // Hiển thị nút Google Sign-In chính thức hoặc nút tùy chỉnh Claude
-  function renderGoogleSignInButton() {
-    const slot = document.getElementById('google-signin-btn-container');
-    if (!slot) return;
-
-    if (_currentUser) {
-      slot.classList.add('hidden');
-      if (btnGoogleLogin) btnGoogleLogin.classList.add('hidden');
-      return;
-    }
-
-    const isDark = document.documentElement.classList.contains('dark');
-
-    // 1. Thử render nút chuẩn của Google SDK
-    if (window.google?.accounts?.id) {
-      try {
-        slot.innerHTML = '';
-        slot.classList.remove('hidden');
-        google.accounts.id.renderButton(slot, {
-          theme: isDark ? 'filled_black' : 'outline',
-          size: 'large',
-          type: 'standard',
-          shape: 'rectangular',
-          text: 'signin_with',
-          logo_alignment: 'left',
-          width: 230
-        });
-        if (btnGoogleLogin) btnGoogleLogin.classList.add('hidden');
-        return;
-      } catch (err) {
-        console.warn('[Google GIS] Lỗi renderButton, chuyển sang nút custom:', err);
-      }
-    }
-
-    // 2. Dự phòng nếu Google SDK chưa tải xong
-    slot.classList.add('hidden');
-    if (btnGoogleLogin) btnGoogleLogin.classList.remove('hidden');
-  }
 
   // Giải mã JWT Token từ Google Identity Services
   function parseJwt(token) {
@@ -260,11 +218,10 @@ const SidebarController = (() => {
     }
   }
 
-  // Khởi tạo Google Identity Services (GIS) & OAuth 2.0 Token Client
+  // Khởi tạo Google Identity Services (GIS) & OAuth 2.0 Token Client (cho Mobile)
   function initGoogleIdentity() {
     if (typeof google === 'undefined' || !google.accounts) {
-      // Đợi Google SDK tải xong
-      setTimeout(initGoogleIdentity, 300);
+      setTimeout(initGoogleIdentity, 400);
       return;
     }
 
@@ -272,7 +229,7 @@ const SidebarController = (() => {
       ? AdvConfig.getGoogleClientId()
       : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
-    // 1. Khởi tạo Token Client OAuth 2.0 (Dùng cho nút bấm chủ động - Hoạt động xuất sắc trên cả PC & Mobile)
+    // Khởi tạo Token Client OAuth 2.0 (Dùng cho Mobile)
     if (google.accounts.oauth2) {
       try {
         _tokenClient = google.accounts.oauth2.initTokenClient({
@@ -286,36 +243,6 @@ const SidebarController = (() => {
         });
       } catch (err) {
         console.warn('[Google OAuth Token Client]', err);
-      }
-    }
-
-    // 2. Khởi tạo Credential ID (Xử lý khi người dùng bấm vào nút Google chính thức)
-    if (google.accounts.id) {
-      try {
-        google.accounts.id.initialize({
-          client_id: clientId,
-          callback: (response) => {
-            if (response && response.credential) {
-              const payload = parseJwt(response.credential);
-              completeGoogleSignIn({
-                id: payload.sub || ('google-' + Date.now()),
-                name: payload.name || payload.given_name || 'Người dùng Google',
-                email: payload.email || 'user@gmail.com',
-                picture: payload.picture || null
-              });
-            }
-          },
-          auto_select: false,
-          cancel_on_tap_outside: true
-        });
-
-        // Render nút Google chính thức vào popover
-        renderGoogleSignInButton();
-
-        // TUYỆT ĐỐI KHÔNG gọi google.accounts.id.prompt() khi vừa vào trang trên PC!
-        // Chỉ hiện đăng nhập khi người dùng chủ động nhấn vào mục Guest/Đăng nhập.
-      } catch (err) {
-        console.warn('[Google GIS]', err);
       }
     }
   }
@@ -344,69 +271,30 @@ const SidebarController = (() => {
       ? AdvConfig.getGoogleClientId()
       : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
-    // 1. Dùng Google OAuth 2.0 Token Client (Popup chuẩn của Google trên PC & Mobile)
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+    const redirectUri = window.location.origin + window.location.pathname;
+
+    // 1. TRÊN DESKTOP: Chuyển hướng trực tiếp 100% đến trang Chọn tài khoản chính thức của Google
+    // (Mở đúng trang accounts.google.com/v3/signin/accountchooser hiển thị danh sách tài khoản như Zerotier)
+    if (!isMobile) {
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20profile%20email&prompt=select_account`;
+      window.location.href = authUrl;
+      return;
+    }
+
+    // 2. TRÊN MOBILE: Sử dụng Token Client của Google SDK
     if (_tokenClient) {
       try {
         _tokenClient.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
-        console.warn('Lỗi gọi requestAccessToken, thử re-init:', e);
+        console.warn('Mobile requestAccessToken lỗi, fallback redirect:', e);
       }
     }
 
-    if (window.google?.accounts?.oauth2) {
-      try {
-        _tokenClient = google.accounts.oauth2.initTokenClient({
-          client_id: clientId,
-          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-          callback: async (tokenResponse) => {
-            if (tokenResponse && tokenResponse.access_token) {
-              fetchGoogleUserInfo(tokenResponse.access_token);
-            }
-          }
-        });
-        _tokenClient.requestAccessToken({ prompt: 'select_account' });
-        return;
-      } catch (e) {
-        console.warn('Lỗi initTokenClient:', e);
-      }
-    }
-
-    // 2. Dự phòng: Mở popup accounts.google.com
-    openGoogleOAuthPopup(clientId);
-  }
-
-  // Dự phòng mở cửa sổ popup Google OAuth 2.0
-  function openGoogleOAuthPopup(clientId) {
-    try {
-      const redirectUri = window.location.origin + window.location.pathname;
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=email%20profile&prompt=select_account`;
-      const popup = window.open(authUrl, 'GoogleSignIn', 'width=520,height=640,top=100,left=150');
-      
-      if (popup) {
-        const interval = setInterval(() => {
-          try {
-            if (popup.closed) {
-              clearInterval(interval);
-              return;
-            }
-            if (popup.location && popup.location.hash && popup.location.hash.includes('access_token=')) {
-              const params = new URLSearchParams(popup.location.hash.substring(1));
-              const token = params.get('access_token');
-              popup.close();
-              clearInterval(interval);
-              if (token) {
-                fetchGoogleUserInfo(token);
-              }
-            }
-          } catch (crossOriginErr) {
-            // Đợi popup redirect về cùng origin
-          }
-        }, 500);
-      }
-    } catch (err) {
-      console.error("Không thể mở popup Google:", err);
-    }
+    // Dự phòng mobile: chuyển hướng trực tiếp
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=openid%20profile%20email&prompt=select_account`;
+    window.location.href = authUrl;
   }
 
   // Hoàn tất xác thực Google (nhận payload từ Google OAuth hoặc mô phỏng)
@@ -519,8 +407,10 @@ const SidebarController = (() => {
     });
   }
 
-  // Chọn 1 phiên để chat tiếp
-  async function selectSession(session) {
+  // Chọn 1 phiên để chat tiếp (Cập nhật URL ?c=... giống hệt ChatGPT & Claude.ai)
+  async function selectSession(session, updateUrl = true) {
+    if (!session) return;
+
     document.querySelectorAll('.sidebar-session-item').forEach(el => {
       el.classList.remove('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
     });
@@ -528,10 +418,40 @@ const SidebarController = (() => {
     const activeEl = sessionList?.querySelector(`[data-session-id="${session.id}"]`);
     if (activeEl) activeEl.classList.add('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
 
+    // Cập nhật URL (?c=sess-xxx) mà không reload trang
+    if (updateUrl) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('c', session.id);
+        window.history.pushState({ sessionId: session.id }, '', url.toString());
+      } catch (e) {}
+    }
+
     // Chuyển sang AppController để khôi phục tin nhắn & ảnh vào khung chat
     if (window.AppController && typeof window.AppController.restoreSession === 'function') {
       window.AppController.restoreSession(session);
     }
+  }
+
+  // Khôi phục phiên chat từ tham số URL (?c=sess-xxx) khi vừa mở web
+  async function checkUrlSessionOnLoad() {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get('c');
+      if (sessionId && _currentUser && window.StorageService) {
+        const sess = await window.StorageService.getSessionById(sessionId);
+        if (sess) {
+          selectSession(sess, false);
+          return;
+        }
+      }
+      if (sessionId && !_currentUser) {
+        // Chưa đăng nhập thì xóa param ?c= trên URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('c');
+        window.history.replaceState({}, '', url.pathname);
+      }
+    } catch (e) {}
   }
 
   // Thêm hoặc cập nhật session (CHỈ LƯU VỚI NGƯỜI ĐÃ ĐĂNG NHẬP)
@@ -632,8 +552,27 @@ const SidebarController = (() => {
     btnGoogleLogin?.addEventListener('click', handleGoogleLogin);
     btnLogout?.addEventListener('click', handleLogout);
 
-    // Kích hoạt Google Identity Services
+    // Kích hoạt Google Identity Services (cho mobile)
     initGoogleIdentity();
+
+    // Lắng nghe nút Back / Forward trên trình duyệt để chuyển đổi đoạn chat theo URL
+    window.addEventListener('popstate', async (e) => {
+      const params = new URLSearchParams(window.location.search);
+      const sessionId = params.get('c');
+      if (sessionId && _currentUser && window.StorageService) {
+        const sess = await window.StorageService.getSessionById(sessionId);
+        if (sess) {
+          selectSession(sess, false);
+          return;
+        }
+      }
+      if (!sessionId && window.AppController) {
+        window.AppController.startNewChat(false);
+      }
+    });
+
+    // Khôi phục đoạn chat từ URL (?c=sess-xxx) khi vừa mở trang web
+    setTimeout(checkUrlSessionOnLoad, 250);
 
     // Xử lý modal đăng nhập Google
     document.getElementById('btn-close-google-modal')?.addEventListener('click', () => {

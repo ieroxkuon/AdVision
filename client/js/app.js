@@ -49,45 +49,53 @@ const AppController = {
   // Khởi động toàn bộ hệ thống
   init() {
     try {
-      // Tự động làm sạch các chuỗi cũ bị lỗi nếu có
-      if (this.state.userPlatform && (this.state.userPlatform.length > 30 || /không|gì|sao|thế nào/i.test(this.state.userPlatform))) {
+      const currentUser = (window.SidebarController && window.SidebarController.getCurrentUser()) 
+        || (window.StorageService ? window.StorageService.getCurrentUser() : null);
+
+      // NẾU LÀ GUEST (CHƯA ĐĂNG NHẬP): Luôn làm mới hoàn toàn khi reload (F5) trang web!
+      // Giúp hàng trăm Guest cùng dùng website hoàn toàn độc lập, không vướng rác cũ.
+      if (!currentUser) {
+        this.state.userName = "";
+        this.state.userIndustry = "";
         this.state.userPlatform = "";
-        try { localStorage.removeItem('adv_user_platform'); } catch(e) {}
-      }
-      if (this.state.userIndustry && (this.state.userIndustry.length > 40 || /nha bạn|nhé|không/i.test(this.state.userIndustry))) {
-        if (this.state.userIndustry.toLowerCase().includes('thực phẩm')) {
-          this.state.userIndustry = "F&B / Thực phẩm";
-        } else {
-          this.state.userIndustry = "";
-        }
-        try { localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY, this.state.userIndustry); } catch(e) {}
+        this.state.campaignGoal = "";
+        this.state.attachedImages = [];
+        this.state.activeImageData = null;
+        this.state.conversationHistory = [];
+        this.state.conversationStage = 'idle';
+        this.state.currentSessionId = 'sess-' + Date.now();
+        this.clearAllAttachments();
+
+        try {
+          localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_NAME);
+          localStorage.removeItem(AdvConfig.STORAGE_KEYS.USER_INDUSTRY);
+          localStorage.removeItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS);
+          localStorage.removeItem('adv_user_platform');
+          localStorage.removeItem('adv_campaign_goal');
+        } catch(e) {}
+
+        UIController.initModals();
+        this.bindEvents();
+        this.updateSystemStatus();
+        this.playInitialGreeting();
+        return;
       }
 
+      // NẾU ĐÃ ĐĂNG NHẬP:
+      this.state.userName = currentUser.name || "";
       UIController.initModals();
       this.bindEvents();
       this.updateSystemStatus();
 
-      if (!this.state.userName) {
-        this.playInitialGreeting();
-      } else {
+      // Nếu không có tham số ?c= trên URL thì mới hiển thị lời chào mừng
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('c')) {
         const callName = (window.PersonaPrompt && PersonaPrompt.getDynamicCallName) 
           ? PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName)
           : (this.state.userName || "bạn");
 
-        // Khôi phục stage phù hợp dựa trên dữ liệu localStorage
-        if (this.state.userIndustry && this.state.userPlatform) {
-          this.state.conversationStage = 'awaiting_image';
-        } else if (this.state.userIndustry) {
-          this.state.conversationStage = 'briefing';
-        } else {
-          this.state.conversationStage = 'onboarding';
-        }
-
-        const welcomeBack = this.state.userPlatform
-          ? `Chào ${callName}, rất vui được gặp lại! Mình thấy bạn đang chạy chiến dịch trên **${this.state.userPlatform}**. Bạn đã chuẩn bị ảnh quảng cáo chưa nhỉ — bấm 📎 để gửi mình xem nhé!`
-          : `Chào ${callName}, rất vui được gặp lại bạn! Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không?`;
+        const welcomeBack = `Chào ${callName}, rất vui được gặp lại bạn! Bạn có hình ảnh quảng cáo nào cần mình thẩm định hôm nay không — hãy nhấn 📎 để tải ảnh lên nhé!`;
         UIController.streamLines([welcomeBack]);
-        this.updateSystemStatus();
       }
     } catch (err) {
       console.error("AdVision Init Error:", err);
@@ -735,11 +743,14 @@ const AppController = {
           this.state.conversationStage = 'image_overview';
           try {
             if (window.SidebarController) {
-              const titleName = (sentImages[0] && sentImages[0].fileName) ? sentImages[0].fileName : 'Thẩm định ảnh quảng cáo';
-              const industry = this.state.userIndustry ? ` (${this.state.userIndustry})` : '';
+              const smartTitle = this.generateSmartTitle({
+                activeImageData: this.state.activeImageData,
+                conversationHistory: this.state.conversationHistory,
+                userIndustry: this.state.userIndustry
+              });
               window.SidebarController.addSession({
                 id: this.state.currentSessionId,
-                title: titleName + industry,
+                title: smartTitle,
                 activeImageData: this.state.activeImageData,
                 conversationHistory: this.state.conversationHistory,
                 stage: this.state.conversationStage
@@ -839,9 +850,15 @@ const AppController = {
       // Cập nhật session vào Database sau mỗi lượt trao đổi
       try {
         if (window.SidebarController) {
+          const smartTitle = this.generateSmartTitle({
+            activeImageData: this.state.activeImageData,
+            conversationHistory: this.state.conversationHistory,
+            firstUserText: text,
+            userIndustry: this.state.userIndustry
+          });
           window.SidebarController.addSession({
             id: this.state.currentSessionId,
-            title: this.state.activeImageData?.fileName || 'Đoạn chat thẩm định hình ảnh',
+            title: smartTitle,
             activeImageData: this.state.activeImageData,
             conversationHistory: this.state.conversationHistory,
             stage: this.state.conversationStage
@@ -851,8 +868,46 @@ const AppController = {
     }
   },
 
+  // Quy luật đặt tên thông minh cho đoạn chat (Phong cách ChatGPT / Claude.ai)
+  generateSmartTitle(sessionData = {}) {
+    const { activeImageData, conversationHistory, firstUserText, userIndustry } = sessionData;
+
+    // Quy luật 1: Nếu có ảnh -> Lấy tên ảnh làm sạch + ngành hàng
+    if (activeImageData && activeImageData.fileName) {
+      let name = activeImageData.fileName.replace(/\.[a-zA-Z0-9]+$/, '');
+      name = name.replace(/^[0-9_\-\s]+/, '');
+      name = name.replace(/[\-_]+/g, ' ').trim();
+      if (name.length >= 2 && !/^(image|img|screenshot|unnamed|photo|picture)$/i.test(name)) {
+        name = name.charAt(0).toUpperCase() + name.slice(1);
+        const suffix = userIndustry ? ` [${userIndustry}]` : '';
+        const full = name + suffix;
+        return full.length > 28 ? full.substring(0, 28) + '...' : full;
+      }
+    }
+
+    // Quy luật 2: Nếu có câu hỏi text của người dùng -> Trích xuất ý chính súc tích
+    const firstText = firstUserText || (conversationHistory && conversationHistory.find(m => m.role === 'user')?.text);
+    if (firstText && typeof firstText === 'string') {
+      let clean = firstText.trim();
+      clean = clean.replace(/^(hãy|bạn|hoàng an|ơi|xem giùm|xem giúp|phân tích|cho mình hỏi|đánh giá|thẩm định|kiểm tra|nhờ bạn|tư vấn)\s+/i, '');
+      clean = clean.replace(/^(giúp mình|giúp tôi|hộ mình|với)\s+/i, '');
+      clean = clean.replace(/[?.!]+$/, '').trim();
+      if (clean.length >= 2) {
+        clean = clean.charAt(0).toUpperCase() + clean.slice(1);
+        return clean.length > 30 ? clean.substring(0, 30) + '...' : clean;
+      }
+    }
+
+    // Quy luật 3: Fallback theo ngành hàng hoặc thời gian
+    if (userIndustry) {
+      return `Chiến dịch ${userIndustry}`;
+    }
+    const now = new Date();
+    return `Đoạn chat ${now.getDate()}/${now.getMonth() + 1} lúc ${now.getHours()}h${String(now.getMinutes()).padStart(2, '0')}`;
+  },
+
   // Bắt đầu một phiên trò chuyện mới (New Chat - phong cách Claude.ai / ChatGPT)
-  startNewChat() {
+  startNewChat(updateUrl = true) {
     this.state.currentSessionId = 'sess-' + Date.now();
     this.state.conversationHistory = [];
     this.state.activeImageData = null;
@@ -864,6 +919,15 @@ const AppController = {
     document.querySelectorAll('.sidebar-session-item').forEach(el => {
       el.classList.remove('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
     });
+
+    // Xóa tham số ?c= trên URL để URL quay về trang chủ sạch sẽ
+    if (updateUrl) {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('c');
+        window.history.pushState({}, '', url.pathname);
+      } catch (e) {}
+    }
 
     // Xóa sạch khung chat
     if (UIController.elements.chatContainer) {

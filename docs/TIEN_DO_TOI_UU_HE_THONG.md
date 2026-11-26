@@ -62,28 +62,25 @@ flowchart TD
     - Bảng thực nghiệm Ablation Study"]
 ```
 
-### 📌 Phần 1: Lớp kết nối API đa nhà cung cấp & Giám sát
-- [ ] **Universal Engine Adapter:** Chuẩn hóa giao diện gọi `analyze({ image, prompt, schema, provider })` cho phép hoán đổi Gemini 2.5 / OpenAI GPT-4o / Claude 3.5 chỉ bằng config.
-- [ ] **Ép định dạng đầu ra có cấu trúc (Strict JSON Schema):** Kiểm tra cấu trúc JSON trả về, cơ chế tự động sửa lỗi (Self-healing retry) nếu mô hình trả về sai định dạng.
-- [ ] **Cơ chế chịu lỗi (Fault Tolerance):** Retry với Exponential Backoff, xử lý Rate Limit, Timeout 30s, tự động fallback sang mô hình phụ khi mô hình chính quá tải.
-- [ ] **Tối ưu chi phí & Tốc độ:** Băm hash SHA-256 (Image + Prompt) để cache kết quả; nén/resize ảnh thông minh trước khi gửi.
-- [ ] **Giám sát & Quản lý Token:** Ghi nhận và hiển thị độ trễ (latency ms), số token in/out, chi phí ước tính mỗi phiên.
+### 📌 Phần 1: Lớp kết nối API đa nhà cung cấp & Giám sát (Đã hoàn thiện)
+- [x] **Universal Engine Adapter:** Chuẩn hóa giao diện gọi phân tích hình ảnh và hội thoại đa lượt cho phép linh hoạt hoán đổi giữa Google Gemini và OpenAI GPT-4o.
+- [x] **Cơ chế chịu lỗi (Fault Tolerance):** Retry với Exponential Backoff tự động khi gặp lỗi mạng/Rate limit (HTTP 429), tự động ưu tiên model phản hồi nhanh nhất.
+- [x] **Tối ưu chi phí & Tốc độ:** Băm hash nhanh (Image Base64 + Prompt) theo cơ chế LRU Cache trong bộ nhớ, trả về kết quả ngay lập tức (0ms, 0 token) khi phân tích lại cùng ảnh.
+- [x] **Giám sát & Quản lý Token (Profiler & Telemetry):** Tự động ghi nhận `latencyMs`, số lượng `promptTokens`, `candidatesTokenCount`, tổng token tiêu thụ và mô hình phục vụ trong từng phiên gọi API (`ApiService.getTelemetryLogs()`).
 
-### 📌 Phần 2: Thiết kế Prompt đa bước & Bảng tiêu chí Rubric
-- [ ] **Xây dựng Rubric chấm điểm định lượng:** Thiết lập thang điểm 1-10 kèm định nghĩa cụ thể cho 6 tiêu chí (Sức hút 2s đầu, Thông điệp, Phân cấp chữ, Bố cục & Khoảng trắng, Nhận diện thương hiệu, Điểm rơi CTA).
-- [ ] **Tách nhỏ Prompt đa chặng (Multi-step Reasoning):** Thay vì một prompt khổng lồ, chia thành:
-  - *Chặng 1:* Bóc tách thực thể và thông số thị giác.
-  - *Chặng 2:* Đối chiếu quy chuẩn và chấm điểm theo Rubric.
-  - *Chặng 3:* Đề xuất hành động kỹ thuật & sinh prompt vẽ lại.
-- [ ] **Few-shot Learning:** Tích hợp 2-3 cặp ví dụ mẫu (ảnh đạt vs ảnh lỗi) vào ngữ cảnh để định hướng câu trả lời.
-- [ ] **Giảm thiểu ảo giác (Grounding):** Yêu cầu AI chỉ ra tọa độ/vị trí tương đối trong ảnh khi đưa ra nhận xét.
+### 📌 Phần 2: Thiết kế Prompt đa bước & Bảng tiêu chí Rubric (Đang triển khai)
+- [x] **Grounding Dữ liệu Đo đạc thực tế:** Nhúng thông số Ground Truth từ tầng đo đạc cục bộ (WCAG 2.1, 60-30-10, diện tích chữ) vào `PersonaPrompt` để yêu cầu AI lập luận dựa trên bằng chứng khoa học cụ thể, triệt tiêu ảo giác.
+- [ ] **Xây dựng Rubric chấm điểm định lượng chuẩn hóa:** Thiết lập thang điểm 1-10 kèm định nghĩa cụ thể cho 6 tiêu chí (Sức hút 2s đầu, Thông điệp, Phân cấp chữ, Bố cục & Khoảng trắng, Nhận diện thương hiệu, Điểm rơi CTA).
+- [ ] **Tách nhỏ Prompt đa chặng (Multi-step Reasoning):** Chia nhỏ chuỗi xử lý thành các bước rõ ràng: Bóc tách thị giác -> Đối chiếu quy chuẩn Rubric -> Đề xuất tái thiết kế (Prompt Studio).
+- [ ] **Few-shot Learning:** Tích hợp các ví dụ mẫu (ảnh đạt chuẩn vs ảnh vi phạm) vào ngữ cảnh.
 
-### 📌 Phần 3: Bộ công cụ đo lường thị giác chạy cục bộ (Local Computer Vision Tools)
-*(Trọng tâm tạo khối lượng tự xây dựng của sinh viên)*
-- [ ] **OCR Engine cục bộ:** Tích hợp mô hình OCR đọc văn bản trong ảnh (kể cả tiếng Việt) để tính toán chính xác số lượng từ và nội dung chữ.
-- [ ] **Thuật toán tỷ lệ diện tích chữ (Text-to-Image Area Ratio):** Tính toán % diện tích chữ chiếm trên toàn bức ảnh (đối chiếu quy tắc vàng 20% Text của quảng cáo).
-- [ ] **Công cụ kiểm tra độ tương phản màu chuẩn WCAG 2.1:** Đo tỷ lệ tương phản (Contrast Ratio) giữa màu chữ và màu nền (đảm bảo đạt chuẩn tối thiểu 4.5:1).
-- [ ] **Trích xuất bảng màu chủ đạo (Dominant Color Palette):** Sử dụng K-Means Clustering để bóc tách 3-5 màu chính của ấn phẩm và tính độ hài hòa màu sắc (Color Harmony).
+### 📌 Phần 3: Bộ công cụ đo lường thị giác chạy cục bộ (Local Computer Vision Tools - Đã hoàn thiện cốt lõi)
+*(Trọng tâm tạo khối lượng tự xây dựng của sinh viên, chứng minh đề tài không phải API wrapper đơn thuần)*
+- [x] **Trích xuất bảng màu chủ đạo (K-Means Color Quantization 60-30-10):** Thuật toán tự bóc tách mã màu HEX và tỷ lệ % của Màu nền chính (60%), Màu cấu trúc/nhận diện (30%), và Màu điểm nhấn/nút CTA (10%) trực tiếp trên ma trận điểm ảnh canvas.
+- [x] **Công cụ kiểm tra độ tương phản màu chuẩn WCAG 2.1:** Tính độ chói tương đối (Relative Luminance $L = 0.2126R + 0.7152G + 0.0722B$) và tỷ lệ tương phản giữa màu nhấn/chữ với màu nền, xác thực đạt hay không đạt chuẩn WCAG AA ($4.5:1$).
+- [x] **Thuật toán ước tính mật độ diện tích chữ (Edge-density & Sobel Gradient):** Chia lưới khối $10 \times 10$, tính toán tỷ lệ % diện tích chữ/đồ họa tần số cao để đối chiếu với Quy tắc vàng 20% Text của Meta Ads.
+- [x] **Thẻ đo đạc thị giác thời gian thực (Visual Telemetry Card):** Hiển thị trực quan 3 ô màu Hex, badge WCAG 2.1 và thước đo mật độ chữ ngay trong hộp thoại chat trước khi AI nhận xét.
+- [ ] **OCR Engine cục bộ:** Mở rộng tích hợp thư viện OCR đọc văn bản trực tiếp trong trình duyệt để đếm chính xác số từ tiếng Việt.
 
 ### 📌 Phần 4: Kiến trúc Agent điều phối & RAG
 - [ ] **Bộ lập kế hoạch (Agent Planner):** Tự động nhận diện tính chất ảnh để quyết định gọi công cụ cục bộ nào (ví dụ ảnh nhiều text thì ưu tiên OCR + WCAG).

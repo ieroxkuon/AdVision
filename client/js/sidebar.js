@@ -36,7 +36,6 @@ const SidebarController = (() => {
   let themeBtns = {};
   let btnGoogleLogin = null;
   let btnLogout = null;
-  let googleAuthModal = null;
   let logoutConfirmModal = null;
   let btnCancelLogout = null;
   let btnConfirmLogout = null;
@@ -279,7 +278,7 @@ const SidebarController = (() => {
     } catch (e) {}
   }
 
-  // Đăng nhập bằng Google (khi người dùng click nút chủ động trên PC hoặc Mobile)
+  // Đăng nhập bằng Google (hỗ trợ cả Desktop và Mobile qua Google Identity Services)
   function handleGoogleLogin() {
     closeUserPopover();
 
@@ -287,38 +286,47 @@ const SidebarController = (() => {
       ? AdvConfig.getGoogleClientId()
       : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
-    const redirectUri = new URL('/', window.location.origin).toString();
-    const redirectToGoogle = () => {
-      const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        response_type: 'token',
-        scope: 'openid profile email',
-        prompt: 'select_account'
-      });
-      window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-    };
-
-    // 1. TRÊN DESKTOP: Chuyển hướng trực tiếp 100% đến trang Chọn tài khoản chính thức của Google
-    // (Mở đúng trang accounts.google.com/v3/signin/accountchooser hiển thị danh sách tài khoản như Zerotier)
-    if (!isMobile) {
-      redirectToGoogle();
-      return;
-    }
-
-    // 2. TRÊN MOBILE: Sử dụng Token Client của Google SDK
+    // 1. Sử dụng Google OAuth 2.0 Token Client (GIS):
+    // Mở trực tiếp cửa sổ Chọn tài khoản chính thức (accounts.google.com/v3/signin/accountchooser)
+    // Hoạt động mượt mà cả Desktop và Mobile mà không bị lỗi redirect_uri_mismatch
     if (_tokenClient) {
       try {
         _tokenClient.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
-        console.warn('Mobile requestAccessToken lỗi, fallback redirect:', e);
+        console.warn('[Google OAuth] requestAccessToken gặp sự cố, thử khởi tạo lại:', e);
       }
     }
 
-    // Dự phòng mobile: chuyển hướng trực tiếp
-    redirectToGoogle();
+    // 2. Nếu Token Client chưa kịp khởi tạo, thử khởi tạo ngay lập tức
+    if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
+      try {
+        _tokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: clientId,
+          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              await fetchGoogleUserInfo(tokenResponse.access_token);
+            }
+          }
+        });
+        _tokenClient.requestAccessToken({ prompt: 'select_account' });
+        return;
+      } catch (err) {
+        console.warn('[Google OAuth] Khởi tạo Token Client thất bại:', err);
+      }
+    }
+
+    // 3. Dự phòng cuối cùng: Chuyển hướng trực tiếp trang
+    const redirectUri = new URL('/', window.location.origin).toString();
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: 'openid profile email',
+      prompt: 'select_account'
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
   }
 
   // Hoàn tất xác thực Google (nhận payload từ Google OAuth hoặc mô phỏng)
@@ -549,7 +557,6 @@ const SidebarController = (() => {
     userPopover = document.getElementById('user-popover-menu');
     btnGoogleLogin = document.getElementById('btn-google-login');
     btnLogout = document.getElementById('btn-logout');
-    googleAuthModal = document.getElementById('google-auth-modal');
     logoutConfirmModal = document.getElementById('logout-confirm-modal');
     btnCancelLogout = document.getElementById('btn-cancel-logout');
     btnConfirmLogout = document.getElementById('btn-confirm-logout');
@@ -620,23 +627,8 @@ const SidebarController = (() => {
       }
     });
 
-    // Kích hoạt Google Identity Services (cho mobile)
+    // Kích hoạt Google Identity Services (Google OAuth 2.0 Token Client)
     initGoogleIdentity();
-
-    // Xử lý modal đăng nhập Google
-    document.getElementById('btn-close-google-modal')?.addEventListener('click', () => {
-      googleAuthModal?.classList.add('hidden');
-    });
-
-    // Nút chọn tài khoản mô phỏng Google trong modal
-    document.querySelectorAll('.mock-google-account-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const name = btn.dataset.name || 'Người dùng Google';
-        const email = btn.dataset.email || 'user@gmail.com';
-        const picture = btn.dataset.picture || null;
-        completeGoogleSignIn({ name, email, picture });
-      });
-    });
   }
 
   return {

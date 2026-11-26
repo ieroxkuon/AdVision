@@ -1,20 +1,65 @@
 /**
  * =============================================================================
- * ADVISION AI - DỊCH VỤ KẾT NỐI MÔ HÌNH THỊ GIÁC NGÔN NGỮ (VLM API SERVICE)
+ * ADVISION AI - DỊCH VỤ KẾT NỐI MÔ HÌNH THỊ GIÁC NGÔN NGỮ (VLM UNIVERSAL ADAPTER)
  * =============================================================================
- * Đảm nhiệm giao tiếp với Google Gemini Vision API (Mô hình chính: gemini-2.5-flash)
+ * Đảm nhiệm giao tiếp chuẩn hóa với Google Gemini Vision API (Mô hình chính: gemini-2.5-flash)
  * và OpenAI Vision API (gpt-4o-mini).
  * 
- * CÔNG NGHỆ NHẬN DẠNG ĐẶC TRƯNG HÌNH ẢNH:
- * - Tận dụng bộ mã hóa Vision Transformer (ViT) tích hợp trong VLM để chuyển đổi
- *   ma trận điểm ảnh (pixel matrix) thành các véc-tơ đặc trưng ngữ nghĩa (multimodal embeddings).
- * - Kết hợp tiền xử lý từ ImageFeatureExtractor để phân tích kích thước và tỷ lệ khung hình.
+ * KIẾN TRÚC TẦNG ĐIỀU PHỐI (COMPOUND AI SYSTEM - LAYER 1):
+ * 1. Universal Adapter: Chuẩn hóa lệnh gọi cho cả Gemini Multimodal và OpenAI GPT-4o.
+ * 2. Caching thông minh: Băm khóa hash (Image + Prompt) để lưu tạm kết quả (0 token, 0ms).
+ * 3. Đo lường & Giám sát (Telemetry & Profiler): Ghi nhận độ trễ (latency ms), token tiêu thụ.
+ * 4. Khả năng chịu lỗi (Fault Tolerance): Tự động thử lại (Retry với Exponential Backoff).
  */
 
 const ApiService = {
   // Ghi nhớ model hoạt động tốt nhất để gọi trực tiếp lần sau (tránh fallback lặp lại)
   activeGeminiModel: null,
 
+  // Bộ nhớ đệm cục bộ (In-Memory LRU Cache) theo hash (Image Base64 + Prompt)
+  _cache: new Map(),
+  _MAX_CACHE_SIZE: 40,
+
+  // Nhật ký giám sát hiệu năng (Performance & Token Telemetry Log)
+  _telemetryLogs: [],
+  _MAX_LOGS: 50,
+
+  /**
+   * Tạo khóa băm nhanh (Fast Hash) từ nội dung ảnh và prompt
+   */
+  generateCacheKey(base64Data, promptText) {
+    const raw = `${(base64Data || '').slice(0, 80)}_${(base64Data || '').length}_${promptText || ''}`;
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+      hash = ((hash << 5) - hash) + raw.charCodeAt(i);
+      hash |= 0;
+    }
+    return `adv_cache_${Math.abs(hash)}`;
+  },
+
+  /**
+   * Ghi log giám sát một lượt gọi API
+   */
+  logTelemetry(entry) {
+    this._telemetryLogs.unshift({
+      timestamp: new Date().toISOString(),
+      ...entry
+    });
+    if (this._telemetryLogs.length > this._MAX_LOGS) {
+      this._telemetryLogs.pop();
+    }
+  },
+
+  /**
+   * Lấy danh sách nhật ký giám sát (dành cho phần Đánh giá & Báo cáo đồ án)
+   */
+  getTelemetryLogs() {
+    return this._telemetryLogs;
+  },
+
+  /**
+   * Danh sách model Gemini sắp xếp theo thứ tự ưu tiên
+   */
   getPrioritizedGeminiModels() {
     if (this.activeGeminiModel) {
       return [this.activeGeminiModel, ...AdvConfig.GEMINI_MODELS.filter(m => m !== this.activeGeminiModel)];
@@ -22,50 +67,127 @@ const ApiService = {
     return AdvConfig.GEMINI_MODELS;
   },
 
+  /**
+   * Hàm gọi với cơ chế thử lại (Retry with Exponential Backoff)
+   */
+  async executeWithRetry(fn, maxRetries = 2, baseDelayMs = 700) {
+    let attempt = 0;
+    while (attempt <= maxRetries) {
+      try {
+        return await fn();
+      } catch (err) {
+        attempt++;
+        if (attempt > maxRetries) throw err;
+        const delay = baseDelayMs * Math.pow(2, attempt - 1);
+        console.warn(`[API Retry] Lần ${attempt}/${maxRetries} thất bại. Chờ ${delay}ms thử lại... Lỗi: ${err.message}`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  },
+
+  // ===========================================================================
   // 1. GỌI GEMINI VISION API ĐỂ THẨM ĐỊNH HÌNH ẢNH (VLM ENGINE)
+  // ===========================================================================
   async callGeminiVisionApi(apiKey, base64Data, mimeType, userText, systemPrompt) {
+    const cacheKey = this.generateCacheKey(base64Data, userText);
+    if (this._cache.has(cacheKey)) {
+      console.log(`[API Cache] HIT cache cho ảnh (${cacheKey})`);
+      this.logTelemetry({
+        provider: 'google-gemini',
+        model: this.activeGeminiModel || 'cache',
+        latencyMs: 0,
+        status: 'CACHE_HIT',
+        tokens: { prompt: 0, candidates: 0, total: 0 }
+      });
+      return this._cache.get(cacheKey);
+    }
+
     const models = this.getPrioritizedGeminiModels();
     let lastErr = null;
+    const startTime = performance.now();
 
     for (const modelName of models) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{
-              role: 'user',
-              parts: [
-                { text: `${systemPrompt}\n\n${userText}` },
-                { inline_data: { mime_type: mimeType, data: base64Data } }
-              ]
-            }]
-          })
+        const textResult = await this.executeWithRetry(async () => {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                role: 'user',
+                parts: [
+                  { text: `${systemPrompt}\n\n${userText}` },
+                  { inline_data: { mime_type: mimeType, data: base64Data } }
+                ]
+              }]
+            })
+          });
+
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            const errMsg = errData.error?.message || `HTTP ${resp.status}`;
+            const err = new Error(errMsg);
+            err.status = resp.status;
+            throw err;
+          }
+
+          const json = await resp.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) throw new Error("Mô hình không trả về nội dung");
+
+          const latencyMs = Math.round(performance.now() - startTime);
+          const usage = json.usageMetadata || {};
+
+          this.logTelemetry({
+            provider: 'google-gemini',
+            model: modelName,
+            latencyMs,
+            status: 'SUCCESS',
+            tokens: {
+              prompt: usage.promptTokenCount || 0,
+              candidates: usage.candidatesTokenCount || 0,
+              total: usage.totalTokenCount || 0
+            }
+          });
+
+          return text;
         });
 
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP ${resp.status}`);
-        }
-
-        const json = await resp.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
+        if (textResult) {
           this.activeGeminiModel = modelName;
-          return text;
+          // Lưu vào Cache
+          this._cache.set(cacheKey, textResult);
+          if (this._cache.size > this._MAX_CACHE_SIZE) {
+            const oldestKey = this._cache.keys().next().value;
+            this._cache.delete(oldestKey);
+          }
+          return textResult;
         }
       } catch (e) {
         lastErr = e;
+        console.warn(`[Gemini Model] ${modelName} lỗi:`, e.message);
       }
     }
+
+    this.logTelemetry({
+      provider: 'google-gemini',
+      model: 'all_failed',
+      latencyMs: Math.round(performance.now() - startTime),
+      status: 'FAILED',
+      error: lastErr?.message
+    });
+
     throw lastErr || new Error("Không thể kết nối với Gemini Vision API");
   },
 
+  // ===========================================================================
   // 2. GỌI GEMINI MULTI-TURN CHAT (HỘI THOẠI ĐA LƯỢT)
+  // ===========================================================================
   async callGeminiMultiTurnChat(apiKey, newText, systemPrompt, conversationHistory = [], activeImageData = null) {
     const models = this.getPrioritizedGeminiModels();
     let lastErr = null;
+    const startTime = performance.now();
 
     const contents = [];
 
@@ -96,66 +218,134 @@ const ApiService = {
 
     for (const modelName of models) {
       try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ contents: contents })
+        const textResult = await this.executeWithRetry(async () => {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+          const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: contents })
+          });
+
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            const errMsg = errData.error?.message || `HTTP ${resp.status}`;
+            const err = new Error(errMsg);
+            err.status = resp.status;
+            throw err;
+          }
+
+          const json = await resp.json();
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) throw new Error("Mô hình không trả về câu trả lời");
+
+          const latencyMs = Math.round(performance.now() - startTime);
+          const usage = json.usageMetadata || {};
+
+          this.logTelemetry({
+            provider: 'google-gemini-chat',
+            model: modelName,
+            latencyMs,
+            status: 'SUCCESS',
+            tokens: {
+              prompt: usage.promptTokenCount || 0,
+              candidates: usage.candidatesTokenCount || 0,
+              total: usage.totalTokenCount || 0
+            }
+          });
+
+          return text;
         });
 
-        if (!resp.ok) {
-          const errData = await resp.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP ${resp.status}`);
-        }
-
-        const json = await resp.json();
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) {
+        if (textResult) {
           this.activeGeminiModel = modelName;
-          return text;
+          return textResult;
         }
       } catch (e) {
         lastErr = e;
       }
     }
+
+    this.logTelemetry({
+      provider: 'google-gemini-chat',
+      model: 'all_failed',
+      latencyMs: Math.round(performance.now() - startTime),
+      status: 'FAILED',
+      error: lastErr?.message
+    });
+
     throw lastErr || new Error("Không thể kết nối với Gemini Chat API");
   },
 
+  // ===========================================================================
   // 3. GỌI OPENAI VISION API (GPT-4o-mini)
+  // ===========================================================================
   async callOpenAiVisionApi(apiKey, base64Data, mimeType, userText, systemPrompt) {
-    const resp = await fetch(AdvConfig.OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: AdvConfig.OPENAI_MODEL,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: userText },
-              { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
-            ]
-          }
-        ],
-        max_tokens: AdvConfig.OPENAI_MAX_TOKENS
-      })
-    });
-
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error(errData.error?.message || "OpenAI API Error");
+    const cacheKey = this.generateCacheKey(base64Data, userText);
+    if (this._cache.has(cacheKey)) {
+      console.log(`[API Cache] HIT cache cho OpenAI Vision (${cacheKey})`);
+      return this._cache.get(cacheKey);
     }
 
-    const json = await resp.json();
-    return json.choices?.[0]?.message?.content || "";
+    const startTime = performance.now();
+
+    const textResult = await this.executeWithRetry(async () => {
+      const resp = await fetch(AdvConfig.OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: AdvConfig.OPENAI_MODEL,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: userText },
+                { type: 'image_url', image_url: { url: `data:${mimeType};base64,${base64Data}` } }
+              ]
+            }
+          ],
+          max_tokens: AdvConfig.OPENAI_MAX_TOKENS
+        })
+      });
+
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${resp.status}`);
+      }
+
+      const json = await resp.json();
+      const latencyMs = Math.round(performance.now() - startTime);
+      const usage = json.usage || {};
+
+      this.logTelemetry({
+        provider: 'openai',
+        model: AdvConfig.OPENAI_MODEL,
+        latencyMs,
+        status: 'SUCCESS',
+        tokens: {
+          prompt: usage.prompt_tokens || 0,
+          candidates: usage.completion_tokens || 0,
+          total: usage.total_tokens || 0
+        }
+      });
+
+      return json.choices?.[0]?.message?.content || "";
+    });
+
+    if (textResult) {
+      this._cache.set(cacheKey, textResult);
+    }
+    return textResult;
   },
 
+  // ===========================================================================
   // 4. GỌI OPENAI MULTI-TURN CHAT
+  // ===========================================================================
   async callOpenAiMultiTurnChat(apiKey, newText, systemPrompt, conversationHistory = [], activeImageData = null) {
+    const startTime = performance.now();
     const messages = [{ role: 'system', content: systemPrompt }];
 
     if (activeImageData) {
@@ -177,29 +367,48 @@ const ApiService = {
 
     messages.push({ role: 'user', content: newText });
 
-    const resp = await fetch(AdvConfig.OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
+    return await this.executeWithRetry(async () => {
+      const resp = await fetch(AdvConfig.OPENAI_API_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: AdvConfig.OPENAI_MODEL,
+          messages: messages,
+          max_tokens: AdvConfig.OPENAI_MAX_TOKENS
+        })
+      });
+
+      if (!resp.ok) {
+        const errData = await resp.json().catch(() => ({}));
+        throw new Error(errData.error?.message || `HTTP ${resp.status}`);
+      }
+
+      const json = await resp.json();
+      const latencyMs = Math.round(performance.now() - startTime);
+      const usage = json.usage || {};
+
+      this.logTelemetry({
+        provider: 'openai-chat',
         model: AdvConfig.OPENAI_MODEL,
-        messages: messages,
-        max_tokens: AdvConfig.OPENAI_MAX_TOKENS
-      })
+        latencyMs,
+        status: 'SUCCESS',
+        tokens: {
+          prompt: usage.prompt_tokens || 0,
+          candidates: usage.completion_tokens || 0,
+          total: usage.total_tokens || 0
+        }
+      });
+
+      return json.choices?.[0]?.message?.content || "";
     });
-
-    if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
-      throw new Error(errData.error?.message || "OpenAI Chat Error");
-    }
-
-    const json = await resp.json();
-    return json.choices?.[0]?.message?.content || "";
   },
 
-  // HÀM ĐIỀU PHỐI VISION: TỰ ĐỘNG CHỌN GEMINI HOẶC OPENAI THEO ĐỊNH DẠNG KEY
+  // ===========================================================================
+  // 5. HÀM ĐIỀU PHỐI VISION: TỰ ĐỘNG CHỌN GEMINI HOẶC OPENAI THEO ĐỊNH DẠNG KEY
+  // ===========================================================================
   async analyzeImage({ apiKey, base64, mimeType, prompt, systemPrompt }) {
     if (apiKey.startsWith('sk-')) {
       return this.callOpenAiVisionApi(apiKey, base64, mimeType, prompt, systemPrompt);
@@ -207,7 +416,9 @@ const ApiService = {
     return this.callGeminiVisionApi(apiKey, base64, mimeType, prompt, systemPrompt);
   },
 
-  // HÀM ĐIỀU PHỐI CHAT TIẾP NỐI
+  // ===========================================================================
+  // 6. HÀM ĐIỀU PHỐI CHAT TIẾP NỐI
+  // ===========================================================================
   async chatNextTurn({ apiKey, text, systemPrompt, conversationHistory, activeImageData }) {
     if (apiKey.startsWith('sk-')) {
       return this.callOpenAiMultiTurnChat(apiKey, text, systemPrompt, conversationHistory, activeImageData);

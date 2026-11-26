@@ -131,7 +131,9 @@ ${this.AI_CONVERSATIONAL_GUIDE}`;
    * Khi có context kênh + mục tiêu → inject quy chuẩn kỹ thuật phù hợp.
    */
   buildVisionUserPrompt(callName, industry, currentImg, index, totalImages, userNote, featureSummary = "", platform = "", campaignGoal = "") {
-    const techSpecs = featureSummary ? `\n\n[Thông số kỹ thuật ảnh]: ${featureSummary}` : "";
+    const techSpecs = featureSummary
+      ? `\n\n[DỮ LIỆU ĐO ĐẠC THỊ GIÁC CỤC BỘ (GROUND TRUTH TELEMETRY)]:\n${featureSummary}\n(Chỉ dẫn thẩm định: Hãy tham chiếu trực tiếp các chỉ số đo đạc vật lý này — tỷ lệ tương phản WCAG 2.1, quy tắc màu 60-30-10, diện tích chữ — làm bằng chứng khoa học cho các nhận xét, tránh suy diễn mơ hồ)`
+      : "";
     const imgLabel = totalImages > 1 ? `bức ảnh thứ ${index + 1}/${totalImages} (${currentImg.fileName})` : `bức ảnh (${currentImg.fileName})`;
     const industryCtx = industry ? `ngành ${industry}` : "thương mại";
     const userContext = userNote ? `Người dùng nhắn: "${userNote}". ` : "";

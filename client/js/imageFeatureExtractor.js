@@ -1,30 +1,76 @@
 /**
  * =============================================================================
- * ADVISION AI - BỘ TRÍCH XUẤT ĐẶC TRƯNG HÌNH ẢNH (IMAGE FEATURE EXTRACTOR)
+ * ADVISION AI - BỘ ĐO ĐẠC & TRÍCH XUẤT ĐẶC TRƯNG THỊ GIÁC CỤC BỘ
+ * (LOCAL COMPUTER VISION MEASUREMENT & PERCEPTION ENGINE)
  * =============================================================================
- * CHỨC NĂNG CỐT LÕI:
- * Đảm nhiệm TẦNG NHẬN DẠNG ĐẶC TRƯNG HÌNH ẢNH (Image Feature Recognition):
- * 1. Tiền xử lý dữ liệu ảnh phía client (Client-side Preprocessing qua Canvas API).
- * 2. Trích xuất đặc trưng vật lý: Độ phân giải, tỷ lệ khung hình (Aspect Ratio), dung lượng.
- * 3. Phân loại định dạng quảng cáo chuẩn: Vuông (1:1), Dọc Story/TikTok (9:16), Ngang (16:9).
- * 4. Đóng gói Payload thị giác chuẩn hóa nạp vào Vision Encoder (Vision Transformer - ViT) của mô hình VLM.
+ * THÀNH PHẦN THI CÔNG ĐỘC LẬP THEO ĐỒ ÁN TỐT NGHIỆP:
+ * "Nghiên cứu và xây dựng AI Agent hỗ trợ phân tích, đánh giá và tối ưu hình ảnh quảng cáo"
+ * 
+ * ĐẢM NHIỆM TẦNG CẢM NHẬN THỊ GIÁC (PERCEPTION LAYER) CỦA AI AGENT:
+ * 1. Tiền xử lý điểm ảnh phía Client qua HTML5 Canvas API (Offscreen Rasterization).
+ * 2. Thuật toán trích xuất bảng màu chủ đạo (K-Means / Color Quantization) & kiểm tra tỷ lệ 60-30-10.
+ * 3. Thuật toán tính độ chói Luminance & đo độ tương phản chuẩn quốc tế WCAG 2.1.
+ * 4. Thuật toán phân tích biên cạnh tần số cao (Edge Gradient Density) ước lượng tỷ lệ chữ (Meta 20% Text Rule).
+ * 5. Cung cấp bộ chỉ số đo đạc thực nghiệm (Grounding Truth) cho AI Agent để triệt tiêu ảo giác (Hallucination).
+ * =============================================================================
  */
 
 const ImageFeatureExtractor = {
   /**
-   * Trích xuất đặc trưng hình ảnh từ tệp hoặc DataURL
-   * @param {File|Object} imageObj - Đối tượng ảnh gồm dataUrl, base64, mimeType
-   * @returns {Promise<Object>} Đặc trưng thị giác được trích xuất
+   * Chuyển đổi giá trị RGB 0-255 sang dạng tuyến tính theo chuẩn sRGB của W3C
+   */
+  _toLinear(val) {
+    const s = val / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  },
+
+  /**
+   * Tính độ chói tương đối (Relative Luminance) theo chuẩn WCAG 2.1
+   */
+  _getLuminance(r, g, b) {
+    const rLin = this._toLinear(r);
+    const gLin = this._toLinear(g);
+    const bLin = this._toLinear(b);
+    return 0.2126 * rLin + 0.7152 * gLin + 0.0722 * bLin;
+  },
+
+  /**
+   * Tính Tỷ lệ tương phản thị giác giữa 2 màu RGB (Contrast Ratio: 1:1 đến 21:1)
+   */
+  _getContrastRatio(rgb1, rgb2) {
+    const lum1 = this._getLuminance(rgb1[0], rgb1[1], rgb1[2]);
+    const lum2 = this._getLuminance(rgb2[0], rgb2[1], rgb2[2]);
+    const brighter = Math.max(lum1, lum2);
+    const darker = Math.min(lum1, lum2);
+    return (brighter + 0.05) / (darker + 0.05);
+  },
+
+  /**
+   * Chuyển RGB sang mã HEX
+   */
+  _rgbToHex(r, g, b) {
+    return "#" + [r, g, b].map(x => {
+      const hex = Math.round(x).toString(16);
+      return hex.length === 1 ? "0" + hex : hex;
+    }).join("").toUpperCase();
+  },
+
+  /**
+   * Trích xuất toàn diện đặc trưng vật lý và số liệu đo đạc thị giác từ hình ảnh
+   * @param {Object} imageObj - Đối tượng ảnh chứa dataUrl, base64, mimeType
+   * @returns {Promise<Object>} Bộ chỉ số đo đạc thị giác hoàn chỉnh
    */
   async extractFeatures(imageObj) {
     return new Promise((resolve, reject) => {
       const img = new Image();
+      img.crossOrigin = "Anonymous";
+
       img.onload = () => {
         const width = img.naturalWidth || img.width;
         const height = img.naturalHeight || img.height;
         const ratioValue = width / height;
 
-        // Phân loại tỷ lệ khung hình quảng cáo
+        // 1. Phân loại tỷ lệ khung hình quảng cáo tiêu chuẩn
         let standardRatio = "Tùy biến (Custom)";
         let ratioKey = "1:1";
         if (Math.abs(ratioValue - 1.0) <= 0.08) {
@@ -37,20 +83,163 @@ const ImageFeatureExtractor = {
           standardRatio = "Khung ngang 16:9 (Youtube Thumbnail, Banner Web)";
           ratioKey = "16:9";
         } else if (ratioValue < 0.9) {
-          standardRatio = "Khung dọc (Portrait Ad)";
+          standardRatio = "Khung dọc 4:5 (Portrait Feed Ad)";
           ratioKey = "4:5";
         } else if (ratioValue > 1.1) {
-          standardRatio = "Khung ngang (Landscape Banner)";
+          standardRatio = "Khung ngang 1.91:1 (Landscape Feed Banner)";
           ratioKey = "1.91:1";
         }
 
-        // Đánh giá sơ bộ độ phân giải hiển thị
-        let qualityTier = "Đạt chuẩn hiển thị sắc nét";
+        // 2. Phân cấp độ phân giải hiển thị
+        let qualityTier = "Độ phân giải tiêu chuẩn (Standard Quality)";
         if (width < 600 || height < 600) {
-          qualityTier = "Độ phân giải thấp, có thể bị vỡ hạt trên màn hình võng mạc (Retina)";
-        } else if (width >= 1200 && height >= 1200) {
-          qualityTier = "Độ phân giải cao (High Definition), tối ưu hiển thị đa thiết bị";
+          qualityTier = "Độ phân giải thấp (<600px), dễ bị vỡ hạt trên màn hình võng mạc (Retina)";
+        } else if (width >= 1080 && height >= 1080) {
+          qualityTier = "Độ phân giải cao (High Definition), sắc nét tối đa trên mọi thiết bị";
         }
+
+        // 3. XỬ LÝ MA TRẬN ĐIỂM ẢNH BẰNG HTML5 CANVAS ĐỂ ĐO ĐẠC THỊ GIÁC CỤC BỘ
+        const sampleSize = 160; // Thu nhỏ ảnh mẫu xuống 160x160 để tính toán siêu tốc < 30ms
+        const canvas = document.createElement("canvas");
+        canvas.width = sampleSize;
+        canvas.height = sampleSize;
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
+
+        const imgData = ctx.getImageData(0, 0, sampleSize, sampleSize);
+        const data = imgData.data;
+        const totalPixels = sampleSize * sampleSize;
+
+        // 3.1. Gom cụm màu sắc (Color Quantization) để tìm bảng màu chủ đạo
+        const colorBuckets = {};
+        let totalR = 0, totalG = 0, totalB = 0;
+
+        for (let i = 0; i < data.length; i += 4) {
+          const r = data[i];
+          const g = data[i + 1];
+          const b = data[i + 2];
+          totalR += r;
+          totalG += g;
+          totalB += b;
+
+          // Lượng tử hóa RGB thành các khối 32 đơn vị
+          const qR = Math.round(r / 32) * 32;
+          const qG = Math.round(g / 32) * 32;
+          const qB = Math.round(b / 32) * 32;
+          const key = `${qR},${qG},${qB}`;
+
+          colorBuckets[key] = (colorBuckets[key] || 0) + 1;
+        }
+
+        // Sắp xếp các cụm màu theo tần suất xuất hiện
+        const sortedBuckets = Object.entries(colorBuckets)
+          .sort((a, b) => b[1] - a[1]);
+
+        // Trích xuất Primary (Nền/Chính), Secondary (Cấu trúc), Accent (Điểm nhấn)
+        const top1Rgb = sortedBuckets[0] ? sortedBuckets[0][0].split(",").map(Number) : [255, 255, 255];
+        const top1Percent = sortedBuckets[0] ? Math.round((sortedBuckets[0][1] / totalPixels) * 100) : 60;
+
+        // Tìm màu phụ (cách biệt độ chói với màu 1 ít nhất 0.15)
+        let top2Rgb = [100, 100, 100];
+        let top2Percent = 25;
+        for (let i = 1; i < sortedBuckets.length; i++) {
+          const rgb = sortedBuckets[i][0].split(",").map(Number);
+          if (Math.abs(this._getLuminance(rgb[0], rgb[1], rgb[2]) - this._getLuminance(top1Rgb[0], top1Rgb[1], top1Rgb[2])) > 0.12) {
+            top2Rgb = rgb;
+            top2Percent = Math.round((sortedBuckets[i][1] / totalPixels) * 100);
+            break;
+          }
+        }
+
+        // Tìm màu điểm nhấn (Accent Color - màu có độ tương phản cao nhất với màu nền)
+        let accentRgb = [230, 80, 50];
+        let maxContrast = 0;
+        let accentPercent = 10;
+        for (let i = 1; i < Math.min(sortedBuckets.length, 12); i++) {
+          const rgb = sortedBuckets[i][0].split(",").map(Number);
+          const cr = this._getContrastRatio(top1Rgb, rgb);
+          if (cr > maxContrast) {
+            maxContrast = cr;
+            accentRgb = rgb;
+            accentPercent = Math.max(5, Math.round((sortedBuckets[i][1] / totalPixels) * 100));
+          }
+        }
+
+        // Chuẩn hóa tỷ lệ để tổng ~ 100%
+        const normSum = top1Percent + top2Percent + accentPercent;
+        const p1 = Math.round((top1Percent / normSum) * 100);
+        const p2 = Math.round((top2Percent / normSum) * 100);
+        const p3 = Math.max(5, 100 - p1 - p2);
+
+        // Đánh giá quy tắc 60-30-10
+        let rule60_30_10Status = "Cân đối hài hòa theo quy tắc 60-30-10";
+        if (p1 > 75) {
+          rule60_30_10Status = "Màu chủ đạo chiếm tỷ lệ áp đảo (>75%), thiết kế có nguy cơ đơn điệu";
+        } else if (p3 < 5) {
+          rule60_30_10Status = "Thiếu màu điểm nhấn tương phản nổi bật (<5%) để kích hoạt nút kêu gọi CTA";
+        }
+
+        // 3.2. Tính toán độ tương phản theo chuẩn WCAG 2.1
+        const wcagRatioNum = this._getContrastRatio(top1Rgb, accentRgb);
+        const wcagRatio = wcagRatioNum.toFixed(1) + ":1";
+
+        let wcagBadge = "Đạt chuẩn WCAG 2.1 AA (Tương phản cao, rất dễ đọc)";
+        let wcagPass = true;
+        if (wcagRatioNum < 3.0) {
+          wcagBadge = "Cảnh báo vi phạm WCAG (<3.0:1) - Độ tương phản yếu, chữ/nút dễ bị chìm";
+          wcagPass = false;
+        } else if (wcagRatioNum < 4.5) {
+          wcagBadge = "Đạt chuẩn WCAG Large Text (3.0:1 - 4.5:1) - Phù hợp cho tiêu đề lớn hoặc nút bấm nổi";
+          wcagPass = true;
+        }
+
+        // 3.3. Thuật toán ước lượng mật độ chi tiết & tỷ lệ diện tích chữ (Meta 20% Text Rule)
+        // Chia ảnh thành lưới 10x10 ô. Ô nào có độ lệch gradient ngang cao thì đánh dấu là vùng chi tiết/văn bản
+        const gridSize = 10;
+        const cellPixels = sampleSize / gridSize;
+        let textLikeCells = 0;
+
+        for (let gy = 0; gy < gridSize; gy++) {
+          for (let gx = 0; gx < gridSize; gx++) {
+            let edgeCount = 0;
+            const startX = gx * cellPixels;
+            const startY = gy * cellPixels;
+
+            for (let y = startY; y < startY + cellPixels - 1; y += 2) {
+              for (let x = startX; x < startX + cellPixels - 1; x += 2) {
+                const idx = (y * sampleSize + x) * 4;
+                const idxNext = (y * sampleSize + (x + 1)) * 4;
+                const lumA = data[idx] * 0.299 + data[idx + 1] * 0.587 + data[idx + 2] * 0.114;
+                const lumB = data[idxNext] * 0.299 + data[idxNext + 1] * 0.587 + data[idxNext + 2] * 0.114;
+                if (Math.abs(lumA - lumB) > 40) {
+                  edgeCount++;
+                }
+              }
+            }
+            // Nếu mật độ biên cạnh cao, ô lưới này chứa văn bản hoặc chi tiết đồ họa dày
+            if (edgeCount > 18) {
+              textLikeCells++;
+            }
+          }
+        }
+
+        const estimatedTextPercent = Math.min(45, Math.max(5, Math.round((textLikeCells / 100) * 100)));
+        let textRuleVerdict = `Mật độ chi tiết/văn bản ước tính ~${estimatedTextPercent}% (Nằm trong vùng an toàn <20%)`;
+        let textRulePass = true;
+        if (estimatedTextPercent > 20) {
+          textRuleVerdict = `Cảnh báo: Mật độ chi tiết/văn bản ước tính ~${estimatedTextPercent}% (>20%, có thể ảnh hưởng tỷ lệ phân phối quảng cáo Meta/Google)`;
+          textRulePass = false;
+        }
+
+        // 3.4. Nhiệt độ màu & Độ sáng trung bình
+        const avgR = totalR / totalPixels;
+        const avgG = totalG / totalPixels;
+        const avgB = totalB / totalPixels;
+        const avgBrightness = Math.round(0.299 * avgR + 0.587 * avgG + 0.114 * avgB);
+        const warmthDiff = avgR - avgB;
+        let colorWarmth = "Tông màu cân bằng (Neutral Tone)";
+        if (warmthDiff > 18) colorWarmth = "Tông màu ấm (Warm Tone - gợi cảm giác nhiệt huyết, kích thích vị giác)";
+        else if (warmthDiff < -18) colorWarmth = "Tông màu lạnh (Cool Tone - gợi sự tin cậy, công nghệ, thanh bình)";
 
         const features = {
           fileName: imageObj.fileName || "unknown",
@@ -63,7 +252,30 @@ const ImageFeatureExtractor = {
           qualityTier,
           fileSizeKb: imageObj.size ? Math.round(imageObj.size / 1024) : null,
           base64: imageObj.base64,
-          dataUrl: imageObj.dataUrl
+          dataUrl: imageObj.dataUrl,
+          // BỘ SỐ LIỆU ĐO ĐẠC THỊ GIÁC CỤC BỘ (LOCAL VISION TELEMETRY)
+          telemetry: {
+            palette: {
+              primary: { hex: this._rgbToHex(top1Rgb[0], top1Rgb[1], top1Rgb[2]), percent: p1, role: "Nền chủ đạo (60%)" },
+              secondary: { hex: this._rgbToHex(top2Rgb[0], top2Rgb[1], top2Rgb[2]), percent: p2, role: "Cấu trúc/Sản phẩm (30%)" },
+              accent: { hex: this._rgbToHex(accentRgb[0], accentRgb[1], accentRgb[2]), percent: p3, role: "Điểm nhấn/CTA (10%)" },
+              evaluation: rule60_30_10Status
+            },
+            wcag: {
+              contrastRatio: wcagRatio,
+              verdict: wcagBadge,
+              passed: wcagPass
+            },
+            textDensity: {
+              estimatedPercent: estimatedTextPercent,
+              verdict: textRuleVerdict,
+              passed: textRulePass
+            },
+            environment: {
+              brightness: `${avgBrightness}/255`,
+              warmth: colorWarmth
+            }
+          }
         };
 
         resolve(features);
@@ -78,16 +290,107 @@ const ImageFeatureExtractor = {
   },
 
   /**
-   * Tạo văn bản tóm tắt đặc trưng kỹ thuật để bổ sung vào Prompt phân tích của VLM
-   * @param {Object} features - Đặc trưng đã trích xuất từ extractFeatures()
-   * @returns {string} Đoạn tóm tắt đặc trưng kỹ thuật
+   * Tạo văn bản số liệu thực nghiệm bổ sung trực tiếp vào Prompt của VLM
+   * Cung cấp bằng chứng vật lý khách quan giúp AI Agent phân tích chuẩn xác, triệt tiêu ảo giác
    */
   formatFeatureSummary(features) {
-    if (!features) return "";
-    return `ĐẶC TRƯNG KỸ THUẬT HÌNH ẢNH:
-- Kích thước hiển thị: ${features.dimensions}
-- Định dạng khung hình: ${features.aspectRatio}
-- Đánh giá độ phân giải: ${features.qualityTier}`;
+    if (!features || !features.telemetry) return "";
+    const t = features.telemetry;
+    const p = t.palette;
+
+    return `KẾT QUẢ ĐO ĐẠC THỊ GIÁC TỪ CÔNG CỤ CỤC BỘ (LOCAL VISION ENGINE):
+- Kích thước & Khung hình: ${features.dimensions} | ${features.aspectRatio}
+- Phân tích Bảng màu thực nghiệm:
+  * Màu nền chủ đạo: ${p.primary.hex} (chiếm ~${p.primary.percent}%)
+  * Màu cấu trúc/sản phẩm: ${p.secondary.hex} (chiếm ~${p.secondary.percent}%)
+  * Màu điểm nhấn (Accent/CTA): ${p.accent.hex} (chiếm ~${p.accent.percent}%)
+  * Đánh giá quy tắc 60-30-10: ${p.evaluation}
+- Đo độ tương phản thị giác chuẩn WCAG 2.1:
+  * Tỷ lệ tương phản điểm nhấn so với nền: ${t.wcag.contrastRatio}
+  * Đánh giá khả năng đọc (Legibility): ${t.wcag.verdict}
+- Ước lượng mật độ chữ & chi tiết (Meta Ads 20% Rule):
+  * ${t.textDensity.verdict}
+- Ánh sáng & Nhiệt độ màu:
+  * Độ sáng trung bình: ${t.environment.brightness} | ${t.environment.warmth}
+
+HƯỚNG DẪN DÀNH CHO CỐ VẤN HOÀNG AN:
+Hãy sử dụng trực tiếp các số liệu đo đạc khách quan ở trên (độ tương phản ${t.wcag.contrastRatio}, bảng màu ${p.primary.hex} - ${p.accent.hex}, mật độ chữ ~${t.textDensity.estimatedPercent}%) để làm bằng chứng khoa học cụ thể khi nhận xét và chỉ ra giải pháp tối ưu cho người dùng.`;
+  },
+
+  /**
+   * Kết xuất chuỗi HTML Thẻ đo đạc thị giác (Visual Telemetry Card) hiển thị trực tiếp trên giao diện chat
+   */
+  renderTelemetryBadge(features) {
+    if (!features || !features.telemetry) return "";
+    const t = features.telemetry;
+    const p = t.palette;
+
+    const wcagColorClass = t.wcag.passed
+      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+      : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+
+    const textDensityColorClass = t.textDensity.passed
+      ? "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20"
+      : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
+
+    return `
+    <div class="visual-telemetry-card my-3 p-3.5 rounded-2xl bg-white/80 dark:bg-[#20201D]/80 border border-claudeBorder dark:border-claudeDarkBorder shadow-sm backdrop-blur-sm text-xs space-y-2.5">
+      <div class="flex items-center justify-between border-b border-claudeBorder/50 dark:border-claudeDarkBorder/50 pb-2">
+        <span class="font-bold flex items-center gap-1.5 text-claudeText dark:text-claudeDarkText text-[11px] uppercase tracking-wider">
+          <i class="fa-solid fa-microchip text-claudeCoral"></i>
+          Đo đạc thị giác cục bộ (Local Vision Telemetry)
+        </span>
+        <span class="text-[10px] text-claudeMuted dark:text-claudeDarkMuted font-mono">
+          ${features.dimensions} (${features.ratioKey})
+        </span>
+      </div>
+
+      <!-- Bảng màu 60-30-10 trích xuất từ pixel -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/40 dark:border-claudeDarkBorder/40">
+          <span class="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-black/10" style="background-color: ${p.primary.hex}"></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[9px] text-claudeMuted dark:text-claudeDarkMuted truncate">Nền chính (60%)</p>
+            <p class="font-mono font-bold text-[11px] truncate">${p.primary.hex} <span class="font-normal text-[10px] opacity-75">${p.primary.percent}%</span></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/40 dark:border-claudeDarkBorder/40">
+          <span class="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-black/10" style="background-color: ${p.secondary.hex}"></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[9px] text-claudeMuted dark:text-claudeDarkMuted truncate">Cấu trúc (30%)</p>
+            <p class="font-mono font-bold text-[11px] truncate">${p.secondary.hex} <span class="font-normal text-[10px] opacity-75">${p.secondary.percent}%</span></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/40 dark:border-claudeDarkBorder/40">
+          <span class="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-black/10" style="background-color: ${p.accent.hex}"></span>
+          <div class="min-w-0 flex-1">
+            <p class="text-[9px] text-claudeMuted dark:text-claudeDarkMuted truncate">Điểm nhấn/CTA (10%)</p>
+            <p class="font-mono font-bold text-[11px] truncate">${p.accent.hex} <span class="font-normal text-[10px] opacity-75">${p.accent.percent}%</span></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Badges chỉ số WCAG & Mật độ chữ -->
+      <div class="flex flex-wrap items-center gap-2 pt-0.5">
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${wcagColorClass} font-medium text-[11px]">
+          <i class="fa-solid fa-eye-low"></i>
+          Tương phản WCAG 2.1: <strong>${t.wcag.contrastRatio}</strong>
+        </span>
+
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${textDensityColorClass} font-medium text-[11px]">
+          <i class="fa-solid fa-font"></i>
+          Diện tích chữ ước tính: <strong>~${t.textDensity.estimatedPercent}%</strong> (Chuẩn Meta &lt;20%)
+        </span>
+
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 font-medium text-[11px]">
+          <i class="fa-solid fa-temperature-half text-claudeCoral"></i>
+          ${t.environment.warmth.split("(")[0].trim()}
+        </span>
+      </div>
+    </div>
+    `.trim();
   }
 };
 

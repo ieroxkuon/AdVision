@@ -638,6 +638,15 @@ const AppController = {
         const currentImg = sentImages[i];
         this.state.activeImageData = currentImg;
 
+        // HIỂN THỊ THẺ ĐO ĐẠC THỊ GIÁC CỤC BỘ (LOCAL VISION TELEMETRY CARD)
+        // Bằng chứng thực nghiệm của Tầng Cảm nhận độc lập (Perception Layer - Tự xây dựng cục bộ)
+        if (window.ImageFeatureExtractor && currentImg.features) {
+          const telemetryHtml = window.ImageFeatureExtractor.renderTelemetryBadge(currentImg.features);
+          if (telemetryHtml && UIController.appendRawHtml) {
+            UIController.appendRawHtml(telemetryHtml);
+          }
+        }
+
         const indicatorText = sentImages.length > 1
           ? `Đang xem ảnh ${i + 1}/${sentImages.length}...`
           : `Đang xem ảnh...`;
@@ -957,6 +966,14 @@ const AppController = {
 
     // Xóa sạch khung chat
     UIController.elements.chatContainer.innerHTML = '';
+
+    // Khôi phục thẻ đo đạc thị giác cục bộ nếu ảnh có lưu telemetry
+    if (this.state.activeImageData?.features && window.ImageFeatureExtractor) {
+      const telemetryHtml = window.ImageFeatureExtractor.renderTelemetryBadge(this.state.activeImageData.features);
+      if (telemetryHtml && UIController.appendRawHtml) {
+        UIController.appendRawHtml(telemetryHtml);
+      }
+    }
 
     // Render lại toàn bộ lịch sử trò chuyện
     const history = this.state.conversationHistory;

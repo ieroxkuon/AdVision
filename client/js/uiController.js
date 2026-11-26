@@ -208,6 +208,13 @@ const UIController = {
     this.scrollToBottom();
   },
 
+  // Thêm đoạn HTML trực tiếp vào khung chat (ví dụ thẻ đo đạc thị giác Visual Telemetry)
+  appendRawHtml(html) {
+    if (!html || !this.elements.chatContainer) return;
+    this.elements.chatContainer.insertAdjacentHTML('beforeend', html);
+    this.scrollToBottom();
+  },
+
   // Hiển thị chỉ báo đang suy nghĩ / soạn tin (phong cách Claude.ai)
   showTypingIndicator(message = "Đang soạn câu trả lời...") {
     this.isAiTyping = true;

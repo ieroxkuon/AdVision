@@ -613,6 +613,9 @@ const SidebarController = (() => {
     themeBtns.light?.addEventListener('click', () => applyTheme('light'));
     themeBtns.dark?.addEventListener('click', () => applyTheme('dark'));
 
+    // Sự kiện Cài đặt API Key từ menu người dùng
+    document.getElementById('btn-api-key-modal')?.addEventListener('click', closeUserPopover);
+
     // Sự kiện Đăng nhập Google
     btnGoogleLogin?.addEventListener('click', handleGoogleLogin);
     btnLogout?.addEventListener('click', openLogoutConfirm);

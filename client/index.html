@@ -209,6 +209,18 @@
             </div>
           </div>
 
+          <div class="border-t border-claudeBorder dark:border-claudeDarkBorder pt-1">
+            <!-- Nút cấu hình API Key trong Menu Cài đặt người dùng (chuẩn Claude / ChatGPT) -->
+            <button id="btn-api-key-modal"
+              class="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-claudeSidebar dark:hover:bg-[#252522] text-xs font-medium text-claudeText dark:text-claudeDarkText transition-all cursor-pointer">
+              <span class="flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-claudeMuted text-xs"></i>
+                <span>Cài đặt API Key</span>
+              </span>
+              <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+            </button>
+          </div>
+
           <div class="border-t border-claudeBorder dark:border-claudeDarkBorder pt-2"></div>
 
           <!-- PHẦN 2: ĐĂNG NHẬP BẰNG GOOGLE / ĐĂNG XUẤT -->
@@ -265,22 +277,8 @@
           </div>
         </div>
         
-        <!-- Nút điều khiển bên phải -->
-        <div class="flex items-center gap-2">
-          <!-- Nút xem danh mục 22 quy chuẩn PDF -->
-          <button id="btn-docs-modal" class="text-xs font-medium text-claudeText dark:text-claudeDarkText bg-white dark:bg-[#20201D] hover:bg-slate-50 dark:hover:bg-[#252522] border border-claudeBorder dark:border-claudeDarkBorder px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm" title="Xem 22 quy chuẩn thẩm định">
-            <i class="fa-regular fa-bookmark text-claudeCoral text-xs"></i>
-            <span class="hidden sm:inline">22 Quy chuẩn</span>
-          </button>
-
-          <!-- Nút cài đặt API Key -->
-          <button id="btn-api-key-modal" class="text-xs font-medium text-claudeText dark:text-claudeDarkText bg-white dark:bg-[#20201D] hover:bg-slate-50 dark:hover:bg-[#252522] border border-claudeBorder dark:border-claudeDarkBorder px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm" title="Cấu hình API Key">
-            <i class="fa-solid fa-key text-claudeMuted text-xs"></i>
-            <span class="hidden sm:inline">API Key</span>
-            <span id="api-status-dot" class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-          </button>
-
-        </div>
+        <!-- Khoảng trống bên phải (Header tối giản, tinh tế chuẩn mực như Claude.ai & ChatGPT) -->
+        <div class="flex items-center gap-2"></div>
       </header>
 
       <!-- CHAT CONTAINER -->

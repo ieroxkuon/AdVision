@@ -167,6 +167,34 @@ const AppController = {
         this.handleChatSubmit();
       });
     }
+
+    // Tiện ích vi mô 1: Dán ảnh trực tiếp từ Clipboard (Ctrl + V) như Claude & ChatGPT
+    document.addEventListener('paste', (e) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const imageFiles = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile();
+          if (file) imageFiles.push(file);
+        }
+      }
+      if (imageFiles.length > 0) {
+        this.handleIncomingFiles(imageFiles);
+      }
+    });
+
+    // Tiện ích vi mô 2: Kéo - Thả hình ảnh trực tiếp vào giao diện (Drag & Drop)
+    window.addEventListener('dragover', (e) => e.preventDefault());
+    window.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+        const imageFiles = Array.from(e.dataTransfer.files).filter(f => f.type && f.type.startsWith('image/'));
+        if (imageFiles.length > 0) {
+          this.handleIncomingFiles(imageFiles);
+        }
+      }
+    });
   },
 
   // Xử lý nạp các file ảnh tải lên

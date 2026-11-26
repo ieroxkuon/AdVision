@@ -45,7 +45,7 @@ const SidebarController = (() => {
   // ---------------------------------------------------------------------------
   function applyTheme(mode) {
     _currentThemeMode = mode;
-    try { localStorage.setItem('adv_theme_mode', mode); } catch (e) {}
+    try { localStorage.setItem('adv_theme_mode', mode); } catch (e) { }
 
     const html = document.documentElement;
 
@@ -96,13 +96,13 @@ const SidebarController = (() => {
   function openSidebar() {
     if (!sidebar) return;
     sidebar.classList.remove('sidebar-collapsed');
-    try { localStorage.setItem('adv_sidebar_open', 'true'); } catch (e) {}
+    try { localStorage.setItem('adv_sidebar_open', 'true'); } catch (e) { }
   }
 
   function closeSidebar() {
     if (!sidebar) return;
     sidebar.classList.add('sidebar-collapsed');
-    try { localStorage.setItem('adv_sidebar_open', 'false'); } catch (e) {}
+    try { localStorage.setItem('adv_sidebar_open', 'false'); } catch (e) { }
   }
 
   function toggleSidebar() {
@@ -275,7 +275,7 @@ const SidebarController = (() => {
           fetchGoogleUserInfo(token);
         }
       }
-    } catch (e) {}
+    } catch (e) { }
   }
 
   // Đăng nhập bằng Google (hỗ trợ cả Desktop và Mobile qua Google Identity Services)
@@ -352,7 +352,7 @@ const SidebarController = (() => {
           window.AppController.state.userName = _currentUser.name;
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     window.location.replace(new URL('/', window.location.origin).toString());
   }
@@ -417,10 +417,11 @@ const SidebarController = (() => {
       item.className = 'sidebar-session-item group flex items-center justify-between gap-2 px-2.5 py-2 rounded-xl text-xs text-[#1F1E1D] dark:text-[#EDECE8] hover:bg-[#E5E2D9]/60 dark:hover:bg-[#2C2B27]/60 transition-colors cursor-pointer';
       item.dataset.sessionId = session.id;
 
+      const sessionTitle = session.title || 'Phiên thẩm định';
       item.innerHTML = `
         <div class="flex items-center gap-2 min-w-0 flex-1">
           <i class="fa-regular fa-message text-[#DA7756] text-[11px] shrink-0"></i>
-          <span class="truncate font-medium">${session.title || 'Phiên thẩm định'}</span>
+          <span class="truncate font-medium" title="${sessionTitle}">${sessionTitle}</span>
         </div>
         <button class="btn-delete-session opacity-0 group-hover:opacity-100 p-1 hover:text-rose-500 text-[#6E6D69] dark:text-[#9A9892] transition-opacity" title="Xóa đoạn chat">
           <i class="fa-regular fa-trash-can text-[10px]"></i>
@@ -453,11 +454,11 @@ const SidebarController = (() => {
     if (!session) return;
 
     document.querySelectorAll('.sidebar-session-item').forEach(el => {
-      el.classList.remove('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
+      el.classList.remove('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active', 'ring-1', 'ring-[#DA7756]/30');
     });
 
     const activeEl = sessionList?.querySelector(`[data-session-id="${session.id}"]`);
-    if (activeEl) activeEl.classList.add('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active');
+    if (activeEl) activeEl.classList.add('bg-[#E5E2D9]', 'dark:bg-[#2C2B27]', 'active', 'ring-1', 'ring-[#DA7756]/30');
 
     if (updateUrl) {
       window.AppRouter.navigate(`/c/${encodeURIComponent(session.id)}`);

@@ -318,7 +318,7 @@ Hãy sử dụng trực tiếp các số liệu đo đạc khách quan ở trên
   },
 
   /**
-   * Kết xuất chuỗi HTML Thẻ đo đạc thị giác (Visual Telemetry Card) hiển thị trực tiếp trên giao diện chat
+   * Kết xuất chuỗi HTML Thẻ đo đạc thị giác (Visual Telemetry Card) tối giản, tinh gọn (Mini & Clean)
    */
   renderTelemetryBadge(features) {
     if (!features || !features.telemetry) return "";
@@ -334,59 +334,44 @@ Hãy sử dụng trực tiếp các số liệu đo đạc khách quan ở trên
       : "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20";
 
     return `
-    <div class="visual-telemetry-card my-3 p-3.5 rounded-2xl bg-white/80 dark:bg-[#20201D]/80 border border-claudeBorder dark:border-claudeDarkBorder shadow-sm backdrop-blur-sm text-xs space-y-2.5">
-      <div class="flex items-center justify-between border-b border-claudeBorder/50 dark:border-claudeDarkBorder/50 pb-2">
-        <span class="font-bold flex items-center gap-1.5 text-claudeText dark:text-claudeDarkText text-[11px] uppercase tracking-wider">
+    <div class="visual-telemetry-card my-2 px-3 py-2 rounded-xl bg-white/70 dark:bg-[#20201D]/70 border border-claudeBorder dark:border-claudeDarkBorder shadow-xs backdrop-blur-xs text-[11px] space-y-1.5">
+      <div class="flex items-center justify-between text-claudeMuted dark:text-claudeDarkMuted">
+        <span class="flex items-center gap-1.5 font-semibold text-claudeText dark:text-claudeDarkText text-[10px] uppercase tracking-wider">
           <i class="fa-solid fa-microchip text-claudeCoral"></i>
-          Đo đạc thị giác cục bộ (Local Vision Telemetry)
+          Đo lường thị giác cục bộ
         </span>
-        <span class="text-[10px] text-claudeMuted dark:text-claudeDarkMuted font-mono">
-          ${features.dimensions} (${features.ratioKey})
-        </span>
+        <span class="font-mono text-[10px] opacity-80">${features.dimensions || ''} (${features.ratioKey || 'Tự do'})</span>
       </div>
 
-      <!-- Bảng màu 60-30-10 trích xuất từ pixel -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/40 dark:border-claudeDarkBorder/40">
-          <span class="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-black/10" style="background-color: ${p.primary.hex}"></span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[9px] text-claudeMuted dark:text-claudeDarkMuted truncate">Nền chính (60%)</p>
-            <p class="font-mono font-bold text-[11px] truncate">${p.primary.hex} <span class="font-normal text-[10px] opacity-75">${p.primary.percent}%</span></p>
-          </div>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <!-- 3 Chip màu 60-30-10 tinh gọn -->
+        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/50 dark:border-claudeDarkBorder/50" title="Bảng màu chính 60-30-10">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10" style="background-color: ${p.primary.hex}"></span>
+          <span class="font-mono text-[10px] font-semibold">${p.primary.hex}</span>
+          <span class="text-[9px] text-claudeMuted">60%</span>
         </div>
 
-        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/40 dark:border-claudeDarkBorder/40">
-          <span class="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-black/10" style="background-color: ${p.secondary.hex}"></span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[9px] text-claudeMuted dark:text-claudeDarkMuted truncate">Cấu trúc (30%)</p>
-            <p class="font-mono font-bold text-[11px] truncate">${p.secondary.hex} <span class="font-normal text-[10px] opacity-75">${p.secondary.percent}%</span></p>
-          </div>
+        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/50 dark:border-claudeDarkBorder/50" title="Màu cấu trúc 30%">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10" style="background-color: ${p.secondary.hex}"></span>
+          <span class="font-mono text-[10px] font-semibold">${p.secondary.hex}</span>
+          <span class="text-[9px] text-claudeMuted">30%</span>
         </div>
 
-        <div class="flex items-center gap-2 p-1.5 rounded-xl bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/40 dark:border-claudeDarkBorder/40">
-          <span class="w-5 h-5 rounded-lg shrink-0 shadow-inner border border-black/10" style="background-color: ${p.accent.hex}"></span>
-          <div class="min-w-0 flex-1">
-            <p class="text-[9px] text-claudeMuted dark:text-claudeDarkMuted truncate">Điểm nhấn/CTA (10%)</p>
-            <p class="font-mono font-bold text-[11px] truncate">${p.accent.hex} <span class="font-normal text-[10px] opacity-75">${p.accent.percent}%</span></p>
-          </div>
+        <div class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-claudeSidebar dark:bg-claudeDarkSidebar border border-claudeBorder/50 dark:border-claudeDarkBorder/50" title="Màu nhấn CTA 10%">
+          <span class="w-2.5 h-2.5 rounded-full shrink-0 border border-black/10" style="background-color: ${p.accent.hex}"></span>
+          <span class="font-mono text-[10px] font-semibold">${p.accent.hex}</span>
+          <span class="text-[9px] text-claudeMuted">10%</span>
         </div>
-      </div>
 
-      <!-- Badges chỉ số WCAG & Mật độ chữ -->
-      <div class="flex flex-wrap items-center gap-2 pt-0.5">
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${wcagColorClass} font-medium text-[11px]">
-          <i class="fa-solid fa-eye-low"></i>
-          Tương phản WCAG 2.1: <strong>${t.wcag.contrastRatio}</strong>
+        <!-- Badge Tương phản WCAG & Mật độ chữ -->
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${wcagColorClass} text-[10px] font-medium" title="Chuẩn tương phản WCAG 2.1">
+          <i class="fa-solid fa-eye-low text-[9px]"></i>
+          WCAG: <strong>${t.wcag.contrastRatio}</strong>
         </span>
 
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${textDensityColorClass} font-medium text-[11px]">
-          <i class="fa-solid fa-font"></i>
-          Diện tích chữ ước tính: <strong>~${t.textDensity.estimatedPercent}%</strong> (Chuẩn Meta &lt;20%)
-        </span>
-
-        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 font-medium text-[11px]">
-          <i class="fa-solid fa-temperature-half text-claudeCoral"></i>
-          ${t.environment.warmth.split("(")[0].trim()}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border ${textDensityColorClass} text-[10px] font-medium" title="Mật độ diện tích chữ (chuẩn Meta <20%)">
+          <i class="fa-solid fa-font text-[9px]"></i>
+          Chữ: <strong>~${t.textDensity.estimatedPercent}%</strong>
         </span>
       </div>
     </div>

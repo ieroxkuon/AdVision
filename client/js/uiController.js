@@ -50,9 +50,15 @@ const UIController = {
     return new Promise(resolve => setTimeout(resolve, ms));
   },
 
-  // Cuộn khung chat xuống đáy mượt mà
-  scrollToBottom() {
-    if (this.elements.chatContainer) {
+  // Cuộn khung chat xuống đáy mượt mà (Smooth scroll)
+  scrollToBottom(smooth = false) {
+    if (!this.elements.chatContainer) return;
+    if (smooth) {
+      this.elements.chatContainer.scrollTo({
+        top: this.elements.chatContainer.scrollHeight,
+        behavior: 'smooth'
+      });
+    } else {
       this.elements.chatContainer.scrollTop = this.elements.chatContainer.scrollHeight;
     }
   },

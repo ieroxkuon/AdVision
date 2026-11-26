@@ -233,10 +233,12 @@ const SidebarController = (() => {
     }
   }
 
-  // Khởi tạo Google Identity Services (GIS) & OAuth 2.0 Token Client (cho Mobile)
+  // Khởi tạo Google Identity Services (GIS) & OAuth 2.0 Token Client
+  let _gisInitAttempts = 0;
   function initGoogleIdentity() {
     if (typeof google === 'undefined' || !google.accounts) {
-      setTimeout(initGoogleIdentity, 400);
+      _gisInitAttempts++;
+      if (_gisInitAttempts < 25) setTimeout(initGoogleIdentity, 400); // thử tối đa 10 giây
       return;
     }
 
@@ -244,7 +246,6 @@ const SidebarController = (() => {
       ? AdvConfig.getGoogleClientId()
       : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
 
-    // Khởi tạo Token Client OAuth 2.0 (Dùng cho Mobile)
     if (google.accounts.oauth2) {
       try {
         _tokenClient = google.accounts.oauth2.initTokenClient({
@@ -253,6 +254,20 @@ const SidebarController = (() => {
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               await fetchGoogleUserInfo(tokenResponse.access_token);
+            } else if (tokenResponse && tokenResponse.error) {
+              console.error('[Google OAuth] Token error:', tokenResponse.error);
+              _showLoginError('Đăng nhập thất bại: ' + tokenResponse.error);
+            }
+          },
+          error_callback: (err) => {
+            console.error('[Google OAuth] GIS error:', err);
+            if (err && err.type === 'popup_blocked_by_browser') {
+              _fallbackToRedirect();
+            } else if (err && (err.type === 'popup_failed_to_open' || err.type === 'unknown')) {
+              _fallbackToRedirect();
+            } else {
+              _showLoginError('Popup bị chặn. Đang chuyển hướng…');
+              setTimeout(_fallbackToRedirect, 800);
             }
           }
         });
@@ -260,6 +275,31 @@ const SidebarController = (() => {
         console.warn('[Google OAuth Token Client]', err);
       }
     }
+  }
+
+  // Hiển thị toast lỗi đăng nhập
+  function _showLoginError(msg) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-rose-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg z-[9999] transition-opacity duration-300';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 4000);
+  }
+
+  // Fallback: chuyển hướng thẳng sang Google OAuth (không dùng popup)
+  function _fallbackToRedirect() {
+    const clientId = (window.AdvConfig && AdvConfig.getGoogleClientId)
+      ? AdvConfig.getGoogleClientId()
+      : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
+    const redirectUri = window.location.origin + '/';
+    const params = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: redirectUri,
+      response_type: 'token',
+      scope: 'openid profile email',
+      prompt: 'select_account'
+    });
+    window.location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
   }
 
   // Kiểm tra token từ URL hash (khi Google OAuth chuyển hướng về)
@@ -278,55 +318,49 @@ const SidebarController = (() => {
     } catch (e) { }
   }
 
-  // Đăng nhập bằng Google (hỗ trợ cả Desktop và Mobile qua Google Identity Services)
+  // Đăng nhập bằng Google (hỗ trợ cả Desktop và Mobile)
   function handleGoogleLogin() {
     closeUserPopover();
 
-    const clientId = (window.AdvConfig && AdvConfig.getGoogleClientId)
-      ? AdvConfig.getGoogleClientId()
-      : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
-
-    // 1. Sử dụng Google OAuth 2.0 Token Client (GIS):
-    // Mở trực tiếp cửa sổ Chọn tài khoản chính thức (accounts.google.com/v3/signin/accountchooser)
-    // Hoạt động mượt mà cả Desktop và Mobile mà không bị lỗi redirect_uri_mismatch
+    // 1. Dùng GIS Token Client nếu đã khởi tạo thành công
     if (_tokenClient) {
       try {
         _tokenClient.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (e) {
-        console.warn('[Google OAuth] requestAccessToken gặp sự cố, thử khởi tạo lại:', e);
+        console.warn('[Google OAuth] requestAccessToken thất bại, fallback redirect:', e);
+        _fallbackToRedirect();
+        return;
       }
     }
 
-    // 2. Nếu Token Client chưa kịp khởi tạo, thử khởi tạo ngay lập tức
+    // 2. GIS chưa khởi tạo xong → thử lại một lần inline
     if (typeof google !== 'undefined' && google.accounts && google.accounts.oauth2) {
       try {
+        const clientId = (window.AdvConfig && AdvConfig.getGoogleClientId)
+          ? AdvConfig.getGoogleClientId()
+          : "748430716195-hk1kn197r5cdm18vs0vafsmv24532mrg.apps.googleusercontent.com";
         _tokenClient = google.accounts.oauth2.initTokenClient({
           client_id: clientId,
           scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               await fetchGoogleUserInfo(tokenResponse.access_token);
+            } else if (tokenResponse && tokenResponse.error) {
+              _showLoginError('Đăng nhập thất bại: ' + tokenResponse.error);
             }
-          }
+          },
+          error_callback: () => _fallbackToRedirect()
         });
         _tokenClient.requestAccessToken({ prompt: 'select_account' });
         return;
       } catch (err) {
-        console.warn('[Google OAuth] Khởi tạo Token Client thất bại:', err);
+        console.warn('[Google OAuth] Inline init thất bại, fallback redirect:', err);
       }
     }
 
-    // 3. Dự phòng cuối cùng: Chuyển hướng trực tiếp trang
-    const redirectUri = new URL('/', window.location.origin).toString();
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: redirectUri,
-      response_type: 'token',
-      scope: 'openid profile email',
-      prompt: 'select_account'
-    });
-    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+    // 3. Dự phòng cuối: redirect thẳng
+    _fallbackToRedirect();
   }
 
   // Hoàn tất xác thực Google (nhận payload từ Google OAuth hoặc mô phỏng)

@@ -77,7 +77,7 @@ flowchart TD
 - [x] **Grounding Dữ liệu Đo đạc thực tế:** Nhúng thông số Ground Truth từ tầng đo đạc cục bộ (WCAG 2.1, 60-30-10, diện tích chữ) vào `PersonaPrompt` để yêu cầu AI lập luận dựa trên bằng chứng khoa học cụ thể, triệt tiêu ảo giác.
 - [x] **Xây dựng Rubric chấm điểm định lượng chuẩn hóa (`scoringService.js`):** Thiết lập thang điểm 1-10 kèm định nghĩa chi tiết cho 6 tiêu chí cốt lõi (Sức hút 2s đầu, Thông điệp, Phân cấp chữ, Bố cục & Khoảng trắng, Nhận diện thương hiệu, Điểm rơi CTA). Parser JSON schema bắt lỗi tự động, tính điểm trung bình có trọng số và gán kết luận Verdict (Xuất sắc / Tốt / Trung bình / Yếu).
 - [x] **Tách nhỏ Prompt đa chặng (Multi-step Reasoning):** Tách biệt quy trình thành các bước độc lập: Tổng quan trực giác 2 giây đầu (`image_overview`) -> Chấm điểm Rubric 6 tiêu chí (`rubric_score`) -> Mổ xẻ điểm nghẽn chuyển đổi (`weaknesses`) -> Hướng dẫn kỹ thuật khắc phục (`actionable`) -> Tái thiết kế sinh Prompt Gen AI (`redesign_prompt`).
-- [ ] **Few-shot Learning:** Tích hợp các ví dụ mẫu (ảnh đạt chuẩn vs ảnh vi phạm) vào ngữ cảnh.
+- [x] **Few-shot Learning (`FEW_SHOT_EXEMPLARS`):** Tích hợp 2 cặp ví dụ mẫu đối chứng thực chiến (Mẫu F&B đạt chuẩn 8.5/10 vs Mẫu vi phạm chìm nút CTA 5.0/10) trực tiếp vào System Prompt của Agent, giúp AI noi gương cách nhận xét thực chiến, triệt tiêu lý thuyết sách vở.
 
 ### 📌 Phần 3: Bộ công cụ đo lường thị giác chạy cục bộ (Local Computer Vision Tools - Đã hoàn thiện cốt lõi)
 *(Trọng tâm tạo khối lượng tự xây dựng của sinh viên, chứng minh đề tài không phải API wrapper đơn thuần)*

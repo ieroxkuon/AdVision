@@ -48,6 +48,20 @@ CHỈ DẪN QUAN TRỌNG:
 Áp dụng các nguyên tắc này để đưa ra lời khuyên thực tế, cụ thể, dễ sửa ngay trên Canva/Photoshop. TUYỆT ĐỐI KHÔNG xưng tên nguyên lý sách vở (như "theo Schopenhauer", "theo Đường treo ngang", "theo Tỷ lệ vàng", "trong không gian RGB 8-bit").
 `.trim(),
 
+  // 2B. VÍ DỤ MẪU ĐỐI CHỨNG THỰC CHIẾN (FEW-SHOT IN-CONTEXT EXEMPLARS)
+  FEW_SHOT_EXEMPLARS: `
+VÍ DỤ MẪU THẨM ĐỊNH THỰC TẾ (FEW-SHOT EXEMPLARS):
+[Mẫu 1 - Ảnh F&B đạt chuẩn chuyển đổi cao (8.5/10)]:
+- Nhận xét trực giác: Bát phở nóng hổi chiếm trọn 60% trung tâm, ánh sáng studio bắt mắt ngay trong 1 giây đầu.
+- Điểm rơi CTA: Nút "Đặt bàn ngay" màu vàng nghệ (#F59E0B) tương phản 6.2:1 trên nền nâu sẫm, nằm đúng điểm rơi góc dưới bên phải.
+- Khoảng thở: Tiêu đề và giá ưu đãi cách chủ thể 35px, chữ không bị dính vào hình.
+
+[Mẫu 2 - Ảnh vi phạm lỗi chìm nút và dính chữ (5.0/10)]:
+- Nhận xét trực giác: Ảnh quá nhiều chi tiết vụn vặt làm mắt quét phân tán, không làm bật được món ăn chính.
+- Điểm rơi CTA: Nút "Mua ngay" màu đỏ thẫm đặt trên nền đỏ cam, độ tương phản chỉ 2.1:1 (chưa đạt chuẩn WCAG), khách lướt nhanh sẽ không nhận ra nút bấm.
+- Hướng dẫn sửa ngay: Đổi nút sang màu Trắng viền vàng nghệ, giãn khoảng cách dòng chữ tiêu đề lên 1.3x và xóa 3 icon phụ để trả lại khoảng thở cho chủ thể.
+`.trim(),
+
   // 3. NGUYÊN TẮC BẮT BUỘC VỚI AI AGENT
   AI_MANDATORY_RULES: `
 NGUYÊN TẮC BẮT BUỘC VỀ GIAO TIẾP VÀ DIỄN ĐẠT:
@@ -126,10 +140,11 @@ ${contextBlock}`.trim();
 
 ${this.PDF_KNOWLEDGE_BASE}
 
+${this.FEW_SHOT_EXEMPLARS}
+
 ${this.AI_MANDATORY_RULES.replace(/{callName}/g, callName)}
 
-${contextBlock}
-${this.AI_CONVERSATIONAL_GUIDE}`;
+${contextBlock}`.trim();
   },
 
   // Tổng hợp System Prompt gửi tới AI Agent (tự động phân tầng theo trạng thái)

@@ -15,6 +15,11 @@
 > 1. **Local Computer Vision & Rule-based Tools (Phần tự xây dựng cục bộ 100%):** OCR bóc tách chữ, thuật toán đo tương phản WCAG 2.1, phân tích bảng màu chủ đạo (Color Palette Extraction), Saliency Map vùng nhìn.
 > 2. **Kiến trúc Agentic AI có điều phối (Planner & RAG):** Độc lập truy xuất 22 quy chuẩn thiết kế, phân loại ngành hàng, chia nhỏ chuỗi tư duy (Multi-step Reasoning).
 > 3. **Lớp trừu tượng API đa nhà cung cấp (Universal API Adapter):** Tự động chuyển đổi Gemini / OpenAI / Claude, ép chuẩn JSON Schema, cơ chế Retry/Backoff, Cache hash ảnh và giám sát token.
+>
+> 💡 **ĐỊNH HƯỚNG THIẾT KẾ CONVERSATIONAL AI CHUẨN MỰC (CLAUDE.AI & CHATGPT STYLE):**
+> Hệ thống kiên định không chạy đua theo hướng nhồi nhét nhiều nút chức năng rườm rà trên thanh công cụ hay giao diện chat. Trải nghiệm người dùng được xây dựng tối giản, tinh tế như Claude.ai và ChatGPT:
+> - Mọi luồng nghiệp vụ (từ tiếp nhận brief, thẩm định chuyên sâu, chấm điểm định lượng, so sánh A/B đến xuất báo cáo) đều được diễn ra hoàn toàn tự nhiên qua hội thoại ngôn ngữ đa lượt (Multi-turn Natural Conversation).
+> - Tuyệt đối không spam hàng loạt nút bấm cứng trên màn hình. Chỉ khi người dùng thực sự giao tiếp và yêu cầu (ví dụ: *"cho mình xin báo cáo thẩm định", "tổng hợp kết quả gửi sếp", "xuất file pdf"*), AI Agent mới tổng hợp toàn bộ tri thức và đính kèm thẻ báo cáo chuyên nghiệp cùng nút in/lưu PDF sạch đẹp.
 
 ---
 
@@ -87,9 +92,9 @@ flowchart TD
 - [ ] **Cơ chế RAG (Retrieval-Augmented Generation):** Đóng gói bộ 22 quy chuẩn thiết kế và chính sách quảng cáo của Meta/Google; truy xuất động đoạn quy chuẩn liên quan đưa vào System Prompt.
 - [ ] **Vòng lặp tối ưu hóa (Optimization Loop):** Đánh giá -> Đề xuất sửa đổi -> Mô phỏng chỉnh sửa (crop/đổi màu) -> Chấm điểm lại vòng 2.
 
-### 📌 Phần 5: Sản phẩm hoàn chỉnh & Công cụ hỗ trợ (Đã tích hợp)
-- [x] **Chế độ so sánh đối đầu A/B (`compare_ab`):** Cho phép nạp 2 hoặc nhiều ảnh cùng lúc, kích hoạt luồng so sánh A/B trực quan theo 4 tiêu chí cốt lõi, tìm ra Winner và khuyến nghị hành động tối ưu CTR.
-- [x] **Xuất báo cáo thẩm định (PDF Export):** Tích hợp công cụ in/lưu báo cáo PDF chuyên nghiệp chuẩn `@media print` sạch đẹp (ẩn sidebar, phím bấm, nút chat; chỉ giữ lại ảnh, số liệu telemetry, bảng điểm Rubric và khuyến nghị của Art Director).
+### 📌 Phần 5: Sản phẩm hoàn chỉnh & Công cụ hỗ trợ (Đã tích hợp chuẩn Conversational)
+- [x] **Chế độ so sánh đối đầu A/B (`compare_ab`):** Khi người dùng nạp 2 hoặc nhiều ảnh cùng lúc, AI Agent tự động phân tích đối sánh 4 góc nhìn thị giác, tìm ra mẫu chiến thắng (Winner) và chỉ dẫn tối ưu CTR.
+- [x] **Xuất báo cáo thẩm định qua hội thoại (Conversational PDF Export):** Người dùng chỉ cần trao đổi tự nhiên ("cho mình xin báo cáo", "xuất file pdf để gửi sếp"), Agent sẽ lập tức tổng hợp một bản Báo cáo Thẩm định Thị giác Chuyên sâu và gửi kèm thẻ in/lưu PDF chuẩn `@media print` ngay trong luồng chat. Không còn nút bấm thừa thãi trên UI.
 
 ### 📌 Phần 6: Khối thực nghiệm và Đánh giá (Evaluation & Ablation Study)
 - [ ] **Thực nghiệm Ablation Study:**

@@ -77,6 +77,9 @@ const AppController = {
 
       } else {
         this.state.userName = currentUser.name || "";
+        if (/^(food|quán ăn|đồ ăn|shop|fb)$/i.test(this.state.userName.trim())) {
+          this.state.userName = "";
+        }
       }
 
       UIController.initModals();
@@ -411,51 +414,40 @@ const AppController = {
     await UIController.streamLines(lines, this.getNextActionsForTopic(topic));
   },
 
-  // Sinh quick actions tiếp theo dựa trên topic vừa trả lời - chuẩn 6 Vòng Art Director
+  // Sinh gợi ý đối thoại tiếp theo tự nhiên (Chuẩn mực Claude.ai/ChatGPT - tối đa 2 gợi ý súc tích)
   getNextActionsForTopic(topic) {
     const map = {
       first_impression: [
-        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
         { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
       ],
       strengths: [
-        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
         { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' }
       ],
       weaknesses: [
-        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🎨 Chỉnh màu nút CTA bật sáng', action: 'fix_cta_color' },
-        { text: '✍️ Sắp xếp lại bố cục chữ', action: 'fix_typography' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '✍️ Sắp xếp lại bố cục chữ', action: 'fix_typography' }
       ],
       fix_order: [
         { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
-        { text: '✍️ Chỉnh bố cục chữ & khoảng cách', action: 'fix_typography' },
-        { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' }
       ],
       platform_fb: [
         { text: '🤖 Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: '🎵 Tối ưu cho TikTok', action: 'platform_tiktok' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '🎵 Tối ưu cho TikTok', action: 'platform_tiktok' }
       ],
       platform_tiktok: [
         { text: '🤖 Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: '📱 Tối ưu cho Facebook', action: 'platform_fb' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '📱 Tối ưu cho Facebook', action: 'platform_fb' }
       ],
       redesign_prompt: [
-        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' },
-        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' }
+        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
+        { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' }
       ],
       compare: [
-        { text: '⚖️ So sánh A/B 2 ảnh', action: 'compare_ab' },
-        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
       ]
     };
     return map[topic] || [];
@@ -607,8 +599,7 @@ const AppController = {
       const nextActions = [
         { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
         { text: '🎨 Hướng dẫn chỉnh màu nút CTA', action: 'fix_cta_color' },
-        { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' }
       ];
 
       await UIController.streamLines(lines, nextActions);
@@ -619,8 +610,7 @@ const AppController = {
         rawResponse
       ];
       await UIController.streamLines(lines, [
-        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' }
       ]);
     }
   },
@@ -674,17 +664,98 @@ KẾT LUẬN:
       .map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
 
     const nextActions = [
-      { text: '📊 Bảng điểm Rubric 6 tiêu chí', action: 'rubric_score' },
-      { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
-      { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' },
-      { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+      { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+      { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' }
     ];
 
     await UIController.streamLines(lines, nextActions);
   },
 
   // ===========================================================================
-  // XUẤT BÁO CÁO THẨM ĐỊNH (PDF EXPORT)
+  // TỔNG HỢP VÀ XUẤT BÁO CÁO THẨM ĐỊNH THỊ GIÁC QUA HỘI THOẠI
+  // ===========================================================================
+  async handleConversationalReport() {
+    if (UIController.isAiTyping) return;
+    const apiKey = AdvConfig.getEffectiveApiKey();
+    if (!apiKey) {
+      if (window.SidebarController) window.SidebarController.openApiKeyModal();
+      return;
+    }
+
+    const img = this.state.activeImageData;
+    if (!img) {
+      await UIController.streamLines(["Bạn hãy gửi hình ảnh quảng cáo để mình tiến hành thẩm định và tổng hợp báo cáo chi tiết nhé!"]);
+      return;
+    }
+
+    const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
+    UIController.showTypingIndicator("Nguyễn Hoàng An đang tổng hợp Báo cáo Thẩm định Thị giác...");
+
+    const promptText = `Người dùng yêu cầu: "Xuất báo cáo thẩm định cho bức ảnh quảng cáo này."
+Hãy tổng hợp một Báo cáo Thẩm định Thị giác Chuyên sâu có cấu trúc mạch lạc:
+1. TỔNG QUAN CHIẾN DỊCH & THỊ GIÁC:
+   - Ngành hàng và kênh phân phối dự kiến.
+   - Điểm số đánh giá tổng thể (thang 1-10) và mức độ sẵn sàng chạy ads.
+2. PHÂN TÍCH CHỈ SỐ KỸ THUẬT CỐT LÕI:
+   - Phối màu & Tỷ lệ 60-30-10 (Nền - Nhận diện - Điểm nhấn CTA).
+   - Độ tương phản chữ và nút CTA theo chuẩn WCAG 2.1 (Đạt/Chưa đạt).
+   - Mật độ văn bản (Text Density < 20% theo quy chuẩn Meta/TikTok).
+3. 3 ĐIỂM NGHẼN CHUYỂN ĐỔI CHÍNH (CẦN KHẮC PHỤC NGAY).
+4. KẾ HOẠCH HÀNH ĐỘNG 3 BƯỚC (ACTION PLAN CHO DESIGNER).
+5. KẾT LUẬN & KHUYẾN NGHỊ CUỐI CÙNG.
+
+Văn phong sắc sảo, đĩnh đạc của một Giám đốc Nghệ thuật, gãy gọn, không dùng từ ngữ giáo điều phô trương, hoàn toàn tập trung vào giải pháp thực tế.`;
+
+    let apiResponse = '';
+    try {
+      apiResponse = await ApiService.chatNextTurn({
+        apiKey,
+        text: promptText,
+        systemPrompt: PersonaPrompt.getVisionSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform, this.state.campaignGoal),
+        conversationHistory: this.state.conversationHistory,
+        activeImageData: this.state.activeImageData
+      });
+    } catch (err) {
+      UIController.hideTypingIndicator();
+      this.showApiError(err.message, () => this.handleConversationalReport());
+      return;
+    }
+
+    UIController.hideTypingIndicator();
+    this.state.conversationHistory.push({ role: 'user', text: "Xuất báo cáo thẩm định" });
+    this.state.conversationHistory.push({ role: 'model', text: apiResponse });
+
+    const lines = apiResponse.split('\n')
+      .map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
+
+    // Stream nội dung báo cáo
+    await UIController.streamLines(lines);
+
+    // Hiển thị Card hành động in/lưu PDF thanh lịch ngay trong luồng chat
+    const reportActionHtml = `
+      <div class="my-3 p-3.5 rounded-2xl bg-white/80 dark:bg-[#20201D]/80 border border-claudeBorder dark:border-claudeDarkBorder shadow-sm flex items-center justify-between gap-3 max-w-lg">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl bg-claudeCoral/10 text-claudeCoral flex items-center justify-center shrink-0">
+            <i class="fa-solid fa-file-pdf text-sm"></i>
+          </div>
+          <div class="min-w-0">
+            <div class="text-xs font-bold text-claudeText dark:text-claudeDarkText truncate">Báo cáo Thẩm định Thị giác AdVision</div>
+            <div class="text-[11px] text-claudeMuted dark:text-claudeDarkMuted">Sẵn sàng xuất file PDF hoặc in lưu trữ</div>
+          </div>
+        </div>
+        <button onclick="window.print()" class="px-3.5 py-1.5 rounded-xl bg-claudeCoral hover:bg-claudeCoralHover text-white text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 shrink-0 cursor-pointer">
+          <i class="fa-solid fa-print"></i>
+          <span>In / Lưu PDF</span>
+        </button>
+      </div>
+    `;
+    if (UIController.appendRawHtml) {
+      UIController.appendRawHtml(reportActionHtml);
+    }
+  },
+
+  // ===========================================================================
+  // XUẤT BÁO CÁO THẨM ĐỊNH (PDF EXPORT TRỰC TIẾP)
   // ===========================================================================
   handleExportPdf() {
     const toast = document.createElement('div');
@@ -714,22 +785,13 @@ KẾT LUẬN:
     // Tự động nhận diện ngữ cảnh (tên, ngành hàng, nền tảng) từ tin nhắn của người dùng
     if (text) {
       const detected = PersonaPrompt.detectContextFromText(text);
-      const wasNameKnown = !!this.state.userName;
 
-      // Nhận diện tên
+      // Chỉ nhận diện tên khi có cấu trúc xưng hô rõ ràng (tránh nhầm từ ngữ ngành hàng thành tên)
       if (detected.userName && !this.state.userName) {
         this.state.userName = detected.userName;
         this.state.nameVariations = detected.nameVariations || [detected.userName];
         localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_NAME, this.state.userName);
         localStorage.setItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS, JSON.stringify(this.state.nameVariations));
-      } else if (!this.state.userName && sentImages.length === 0 && text.split(/\s+/).length <= 2 && !text.includes('?')) {
-        const parsed = PersonaPrompt.extractSmartName(text);
-        if (parsed.mainName && parsed.mainName !== "bạn") {
-          this.state.userName = parsed.mainName;
-          this.state.nameVariations = parsed.variations;
-          localStorage.setItem(AdvConfig.STORAGE_KEYS.USER_NAME, this.state.userName);
-          localStorage.setItem(AdvConfig.STORAGE_KEYS.NAME_VARIATIONS, JSON.stringify(this.state.nameVariations));
-        }
       }
 
       // Nhận diện ngành hàng
@@ -761,87 +823,14 @@ KẾT LUẬN:
 
     const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
 
-    // =========================================================================
-    // VÒNG 1: ONBOARDING NHANH (ZERO-LATENCY TỨC THÌ)
-    // =========================================================================
-    if (
-      this.state.conversationStage === 'idle' || this.state.conversationStage === 'onboarding'
-    ) {
-      const hasName = !!this.state.userName;
-      const hasIndustry = !!this.state.userIndustry;
-      const hasPlatform = !!this.state.userPlatform;
-      const hasCampaignGoal = !!this.state.campaignGoal;
-
-      // 1A. Người dùng chỉ mới nhập Tên -> Phản hồi tức thì trong 0.05s chào Tên và hỏi ngành
-      if (hasName && !hasIndustry && !hasPlatform && !hasCampaignGoal && sentImages.length === 0) {
-        this.state.conversationStage = 'onboarding';
-        const instantGreeting = [
-          `Chào ${callName}! Rất vui được đồng hành cùng bạn.`,
-          `Hôm nay ${callName} cần mình đồng hành tối ưu hình ảnh cho sản phẩm hoặc chiến dịch nào vậy?`
-        ];
-        await UIController.streamLines(instantGreeting, [
-          { text: '🍗 Quán ăn / F&B gà rán', action: 'industry_fnb' },
-          { text: '👗 Thời trang / Phụ kiện', action: 'industry_fashion' },
-          { text: '💄 Mỹ phẩm / Làm đẹp', action: 'industry_beauty' },
-          { text: '📱 Công nghệ / Điện tử', action: 'industry_tech' }
-        ]);
-        this.updateSystemStatus();
-        return;
-      }
-
-      // 1B. Đã có cả Tên + Ngành hàng -> Chuyển ngay sang Vòng 2 Briefing
-      if (hasName && hasIndustry && !hasPlatform && !hasCampaignGoal && sentImages.length === 0) {
-        this.state.conversationStage = 'briefing';
-        const briefingLines = PersonaPrompt.buildOnboardingToBriefing(callName, this.state.userIndustry);
-        await UIController.streamLines(briefingLines, [
-          { text: '📱 Facebook Feed 1:1 - Ưu đãi giảm 30%', action: 'briefing_fb_sales' },
-          { text: '📱 Facebook Feed 1:1 - Khai trương quán', action: 'briefing_fb_launch' },
-          { text: '🎵 TikTok / Reels 9:16', action: 'briefing_tiktok' },
-          { text: '🛒 Sàn Shopee / Lazada', action: 'briefing_ecommerce' }
-        ]);
-        this.updateSystemStatus();
-        return;
-      }
+    // Kiểm tra ý định người dùng muốn nhận Báo cáo thẩm định (Conversational Report Request)
+    const isReportRequest = /\b(xuất báo cáo|cho mình xin báo cáo|lấy báo cáo|tổng hợp báo cáo|báo cáo thẩm định|tải báo cáo|in báo cáo|file pdf|xuất pdf|báo cáo chi tiết)\b/i.test(text);
+    if (isReportRequest && this.state.activeImageData) {
+      await this.handleConversationalReport();
+      return;
     }
 
-    // =========================================================================
-    // VÒNG 2 → CHỜ ẢNH: Người dùng trả lời về kênh + mục tiêu → xác nhận brief
-    // =========================================================================
-    if (this.state.conversationStage === 'briefing' && sentImages.length === 0 && text) {
-      const briefing = PersonaPrompt.parseBriefingAnswer(text);
-
-      // Cập nhật kênh nếu tìm thấy
-      if (briefing.platform) {
-        this.state.userPlatform = briefing.platformLabel;
-        localStorage.setItem('adv_user_platform', this.state.userPlatform);
-      }
-      // Cập nhật mục tiêu nếu tìm thấy
-      if (briefing.goal) {
-        this.state.campaignGoal = briefing.goal;
-        localStorage.setItem('adv_campaign_goal', this.state.campaignGoal);
-      }
-
-      // Nếu đã đủ cả kênh lẫn mục tiêu → xác nhận brief và mời gửi ảnh
-      const finalPlatform = briefing.platform || '';
-      const finalGoal = briefing.goal || '';
-      const finalPlatformLabel = briefing.platformLabel || this.state.userPlatform || 'kênh đã chọn';
-      const finalGoalLabel = briefing.goalLabel || this.state.campaignGoal || 'mục tiêu đã chọn';
-
-      if (finalPlatform || finalGoal) {
-        this.state.conversationStage = 'awaiting_image';
-        const confirmLines = PersonaPrompt.buildBriefingConfirm(
-          callName, finalPlatformLabel, finalGoalLabel, finalPlatform, finalGoal
-        );
-        await UIController.streamLines(confirmLines, [
-          { text: '📎 Gửi ảnh để thẩm định ngay', action: '__attach__' }
-        ]);
-        this.updateSystemStatus();
-        return;
-      }
-      // Nếu không parse được kênh/mục tiêu → để AI trả lời tự nhiên (fall through)
-    }
-
-    // Chọn Prompt phân tầng: có ảnh thì dùng Vision Prompt (kèm 16 PDF), chưa ảnh thì dùng Mini Prompt siêu nhẹ
+    // Chọn Prompt phân tầng linh hoạt: có ảnh thì dùng Vision Prompt chuyên sâu, chưa có ảnh thì dùng Conversational Prompt tự nhiên
     const systemPrompt = (sentImages.length > 0 || this.state.activeImageData)
       ? PersonaPrompt.getVisionSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform, this.state.campaignGoal)
       : PersonaPrompt.getConversationalSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform, this.state.campaignGoal);
@@ -943,22 +932,18 @@ KẾT LUẬN:
 
         const isLast = (i === sentImages.length - 1);
 
-        // Quick actions sau overview: Chuẩn kịch bản Art Director Vòng 3
+        // Gợi ý đối thoại sau overview: Chuẩn kịch bản Art Director tự nhiên (tối đa 2 gợi ý, không spam nút)
         let quickActions = null;
         if (isLast) {
           if (sentImages.length > 1) {
             quickActions = [
-              { text: '⚖️ So sánh A/B 2 ảnh', action: 'compare_ab' },
-              { text: '📊 Bảng điểm Rubric 6 tiêu chí', action: 'rubric_score' },
-              { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-              { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+              { text: '⚖️ So sánh A/B ảnh nào tốt hơn', action: 'compare_ab' },
+              { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' }
             ];
           } else {
             quickActions = [
-              { text: '📊 Bảng điểm Rubric 6 tiêu chí', action: 'rubric_score' },
               { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-              { text: '✨ Điểm sáng làm tốt', action: 'strengths' },
-              { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+              { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
             ];
           }
         }

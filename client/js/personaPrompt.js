@@ -104,7 +104,7 @@ Phong cách của bạn: Sắc sảo, thấu hiểu, chân thành, tự nhiên n
 
 NGUYÊN TẮC BẮT BUỘC:
 1. Xưng hô: Tự xưng là "mình", gọi đối phương là "${safeCallName}". Nếu chưa biết tên, luôn gọi là "bạn". Tuyệt đối KHÔNG lấy từ ngữ ngành hàng (như food, shop, quán ăn) làm tên người dùng.
-2. Tuyệt đối không dùng ký tự mũi tên ("->", "-->", "→", "⇒", ">").
+2. Tuyệt đối không dùng các ký hiệu mũi tên suy luận logic. Luôn dùng câu văn diễn đạt tự nhiên hoặc dấu phẩy, gạch đầu dòng.
 3. Tuyệt đối KHÔNG SAI CHÍNH TẢ hay ngữ pháp tiếng Việt. Dấu câu rõ ràng, ngắt câu gãy gọn.
 4. Trả lời đúng trọng tâm câu hỏi của người dùng, thực tế, hóm hỉnh và hữu ích, ngắn gọn súc tích (dưới 80 từ).
 5. Khi người dùng nói về ngành hàng (như food, đồ ăn, thời trang, mỹ phẩm...) hoặc kênh chạy (Facebook, TikTok...), hãy nắm bắt và hưởng ứng tự nhiên, gợi ý họ gửi ảnh qua nút kẹp giấy 📎 để bạn soi chi tiết.
@@ -253,7 +253,7 @@ Kết thúc: "${safeCallName} mang Prompt này dán vào ChatGPT (DALL-E 3) ho�
     if (!rawText) return { mainName: "bạn", fullName: "bạn", variations: ["bạn"] };
 
     let extracted = "";
-    const m = rawText.match(/(?:mình tên là|tên mình là|tôi tên là|tên tôi là|tên em là|mình tên|tên mình|tôi tên|tên tôi|tên em|cứ gọi mình là|cứ gọi tôi là|gọi là|mình là|tôi là)\s+([A-ZÀ-Ỹa-zà-ỹ\s]+?)(?:[,.!?;:\n]|(?:\s+(?:mình|tôi|em|đang|chuẩn bị|quán|chạy|và|cần))\b|$)/i);
+    const m = rawText.match(/(?:mình tên là|tên mình là|tôi tên là|tên tôi là|tên em là|mình tên|tên mình|tôi tên|tên tôi|tên em|cứ gọi mình là|cứ gọi tôi là|gọi là|mình là|tôi là)\s+([A-ZÀ-Ỹa-zà-ỹ\s]+?)(?:[,.!?;:\n]|(?:\s+(?:mình|tôi|em|đang|chuẩn bị|quán|chạy|và|cần|nhé|nha|ạ|ơi|nghen|nè))\b|$)/i);
     if (m) {
       extracted = m[1];
     } else {
@@ -264,7 +264,7 @@ Kết thúc: "${safeCallName} mang Prompt này dán vào ChatGPT (DALL-E 3) ho�
     }
 
     // Loại bỏ các từ phụ trợ xưng hô ở cuối câu
-    extracted = extracted.replace(/(^|\s+)(nhé|nha|ạ|nghen|nè|ơi)($|\s+|[.,!?])/gi, ' ').replace(/[.,!?:;]+/g, '').trim();
+    extracted = extracted.replace(/(?:^|\s+)(nhé|nha|ạ|nghen|nè|ơi)(?:$|\s+|[.,!?])/gi, ' ').replace(/[.,!?:;]+/g, '').trim();
 
     const parts = extracted.split(/\s+/).filter(Boolean);
     if (parts.length === 0) return { mainName: "bạn", fullName: "bạn", variations: ["bạn"] };
@@ -287,14 +287,14 @@ Kết thúc: "${safeCallName} mang Prompt này dán vào ChatGPT (DALL-E 3) ho�
     return { mainName, fullName: parts.join(' ') || mainName, variations };
   },
 
-  // Tự động nhận diện ngành hàng, nền tảng hoặc tên từ nội dung chat
+  // Tự động nhận diện ngành hàng, nền tảng hoặc tên từ nội dung chat (Unicode-safe)
   detectContextFromText(rawText) {
     if (!rawText) return {};
     const lower = rawText.toLowerCase();
     const result = {};
 
-    // Nhận diện cấu trúc giới thiệu tên rõ ràng
-    if (/^(mình tên|tên mình|tôi tên|tên tôi|tên em|tên anh|cứ gọi mình là|cứ gọi tôi là|gọi là|mình là|tôi là)\b/i.test(rawText)) {
+    // Nhận diện cấu trúc giới thiệu tên rõ ràng (Unicode-safe không dùng \b sau nguyên âm có dấu)
+    if (/(?:^|\s)(?:mình tên|tên mình|tôi tên|tên tôi|tên em|tên anh|cứ gọi mình là|cứ gọi tôi là|gọi là|mình là|tôi là)(?:\s+|$)/i.test(rawText)) {
       const parsed = this.extractSmartName(rawText);
       if (parsed.mainName && parsed.mainName !== "bạn") {
         result.userName = parsed.mainName;
@@ -302,27 +302,27 @@ Kết thúc: "${safeCallName} mang Prompt này dán vào ChatGPT (DALL-E 3) ho�
       }
     }
 
-    // Nhận diện ngành hàng
-    if (/\b(food|gà rán|quán gà rán|đồ ăn nhanh|fastfood|thực phẩm|f&b|đồ ăn|ẩm thực|nước uống|trà sữa|cà phê|coffee|nhà hàng|quán ăn|quán|bánh kẹo|món ăn|thịt|cá|rau củ|bếp)\b/i.test(lower)) {
+    // Nhận diện ngành hàng (Unicode-safe không dùng \b cho tiếng Việt có dấu)
+    if (/(?:^|\s)(food|gà rán|quán gà rán|đồ ăn nhanh|fastfood|thực phẩm|f&b|đồ ăn|ẩm thực|nước uống|trà sữa|cà phê|coffee|nhà hàng|quán ăn|quán|bánh kẹo|món ăn|thịt|cá|rau củ|bếp)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userIndustry = "F&B / Ẩm thực";
-    } else if (/\b(thời trang|quần áo|váy|đầm|giày|túi xách|phụ kiện thời trang|áo thun|sơ mi)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(thời trang|quần áo|váy|đầm|giày|túi xách|phụ kiện thời trang|áo thun|sơ mi)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userIndustry = "Thời trang";
-    } else if (/\b(mỹ phẩm|skincare|son môi|kem chống nắng|chăm sóc da|làm đẹp|spa|serum)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(mỹ phẩm|skincare|son môi|kem chống nắng|chăm sóc da|làm đẹp|spa|serum)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userIndustry = "Mỹ phẩm & Làm đẹp";
-    } else if (/\b(công nghệ|điện thoại|laptop|tai nghe|phần mềm|thiết bị điện tử|gadget)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(công nghệ|điện thoại|laptop|tai nghe|phần mềm|thiết bị điện tử|gadget)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userIndustry = "Công nghệ";
-    } else if (/\b(bất động sản|nhà đất|căn hộ|chung cư|villa)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(bất động sản|nhà đất|căn hộ|chung cư|villa)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userIndustry = "Bất động sản";
     }
 
     // Nhận diện nền tảng quảng cáo
-    if (/\b(facebook|fb|meta|instagram|insta|ig)\b/i.test(lower)) {
+    if (/(?:^|\s)(facebook|fb|meta|instagram|insta|ig)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userPlatform = "Facebook & Instagram";
-    } else if (/\b(tiktok|tik tok)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(tiktok|tik tok)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userPlatform = "TikTok";
-    } else if (/\b(google|youtube|gdn|search ads)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(google|youtube|gdn|search ads)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userPlatform = "Google Ads";
-    } else if (/\b(shopee|lazada|tiki|sàn tmđt|thương mại điện tử)\b/i.test(lower)) {
+    } else if (/(?:^|\s)(shopee|lazada|tiki|sàn tmđt|thương mại điện tử)(?:$|\s|[.,!?])/i.test(lower)) {
       result.userPlatform = "E-commerce";
     }
 
@@ -586,7 +586,14 @@ QUAN TRỌNG: Chỉ trả về JSON thuần, KHÔNG thêm bất kỳ văn bản 
 
   // Lấy tên ngẫu nhiên trong danh sách biến thể để xưng hô tự nhiên (bảo vệ tuyệt đối khỏi từ ngữ rác)
   getDynamicCallName(variations, fallbackName = "bạn") {
-    const isBadName = (name) => !name || /^(food|quán ăn|đồ ăn|shop|fb|facebook|tiktok|ads)$/i.test(name.trim());
+    const isBadName = (name) => {
+      if (!name || typeof name !== 'string') return true;
+      const lower = name.trim().toLowerCase();
+      if (/^(food|quán ăn|đồ ăn|shop|fb|facebook|tiktok|ads)$/i.test(lower)) return true;
+      if (/(?:^|\s)(quán|áo|váy|đầm|son|kem|mỹ phẩm|thời trang|bán|mua|sản phẩm|quảng cáo|banner|feed|story)(?:$|\s)/i.test(lower)) return true;
+      if (lower.split(/\s+/).length > 3) return true;
+      return false;
+    };
 
     if (!variations || variations.length === 0) {
       return isBadName(fallbackName) ? "bạn" : fallbackName;
@@ -601,3 +608,28 @@ QUAN TRỌNG: Chỉ trả về JSON thuần, KHÔNG thêm bất kỳ văn bản 
 };
 
 window.PersonaPrompt = PersonaPrompt;
+
+// =============================================================================
+// CÔNG CỤ KIỂM THỬ HỘI THOẠI TRỰC TIẾP TRÊN TRÌNH DUYỆT (BROWSER CONSOLE RUNNER)
+// Gõ runDialogueStressTest() trong Console (F12) để chạy đánh giá tự động
+// =============================================================================
+window.runDialogueStressTest = function() {
+  console.log("%c[ADVISION EVALS] Đang chạy bộ kiểm định chất lượng hội thoại...", "color: #DA7756; font-weight: bold; font-size: 13px;");
+  const tests = [
+    { name: "Chống nhận nhầm 'food' thành tên riêng", pass: !PersonaPrompt.detectContextFromText("food").userName && PersonaPrompt.getDynamicCallName(["food"], "bạn") === "bạn" },
+    { name: "Chống nhận nhầm 'quán ăn' thành tên riêng", pass: !PersonaPrompt.detectContextFromText("quán ăn").userName && PersonaPrompt.getDynamicCallName(["quán ăn"], "bạn") === "bạn" },
+    { name: "Trích xuất đúng tên: 'mình tên là Tuấn'", pass: PersonaPrompt.detectContextFromText("mình tên là Tuấn").userName === "Tuấn" },
+    { name: "Trích xuất đúng tên: 'cứ gọi mình là Minh nhé'", pass: PersonaPrompt.detectContextFromText("cứ gọi mình là Minh nhé").userName === "Minh" },
+    { name: "Nhận diện đúng ngành F&B từ 'food'", pass: PersonaPrompt.detectContextFromText("food").userIndustry === "F&B / Ẩm thực" },
+    { name: "Nhận diện đúng Bất động sản từ 'bán căn hộ chung cư'", pass: PersonaPrompt.detectContextFromText("bán căn hộ chung cư").userIndustry === "Bất động sản" },
+    { name: "Nhận diện đúng kênh Facebook từ 'chạy fb feed 1:1'", pass: PersonaPrompt.detectContextFromText("chạy fb feed 1:1").userPlatform === "Facebook & Instagram" },
+    { name: "Bắt đúng ý định xuất báo cáo: 'cho mình xin báo cáo thẩm định'", pass: /\b(xuất báo cáo|cho mình xin báo cáo|lấy báo cáo|tổng hợp báo cáo|báo cáo thẩm định|tải báo cáo|in báo cáo|file pdf|xuất pdf)\b/i.test("cho mình xin báo cáo thẩm định") },
+    { name: "Không kích hoạt nhầm xuất báo cáo với 'làm sao để tăng điểm'", pass: !/\b(xuất báo cáo|cho mình xin báo cáo|lấy báo cáo|tổng hợp báo cáo|báo cáo thẩm định|tải báo cáo|in báo cáo|file pdf|xuất pdf)\b/i.test("làm sao để tăng điểm") },
+    { name: "System Prompt không chứa thuật ngữ hàn lâm phô trương", pass: !/Schopenhauer|RGB 8-bit|Đường treo ngang|Tỷ lệ vàng 1:1.618/.test(PersonaPrompt.getConversationalSystemPrompt("Tuấn")) }
+  ];
+
+  console.table(tests.map(t => ({ "Tiêu chuẩn kiểm định": t.name, "Kết quả": t.pass ? "✅ PASS" : "❌ FAIL" })));
+  const passCount = tests.filter(t => t.pass).length;
+  console.log(`%c[KẾT QUẢ]: ${passCount}/${tests.length} tiêu chuẩn đạt chuẩn (${((passCount/tests.length)*100).toFixed(0)}%)`, "color: #10b981; font-weight: bold; font-size: 12px;");
+  return { total: tests.length, passed: passCount, passRate: passCount / tests.length };
+};

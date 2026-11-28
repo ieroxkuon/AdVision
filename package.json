@@ -7,7 +7,7 @@
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node tests/dialogue_stress_test.js",
     "build": "echo \"Static web deployment ready\"",
     "start": "node server/gateway.js"
   },

@@ -68,10 +68,10 @@ flowchart TD
 - [x] **Tối ưu chi phí & Tốc độ:** Băm hash nhanh (Image Base64 + Prompt) theo cơ chế LRU Cache trong bộ nhớ, trả về kết quả ngay lập tức (0ms, 0 token) khi phân tích lại cùng ảnh.
 - [x] **Giám sát & Quản lý Token (Profiler & Telemetry):** Tự động ghi nhận `latencyMs`, số lượng `promptTokens`, `candidatesTokenCount`, tổng token tiêu thụ và mô hình phục vụ trong từng phiên gọi API (`ApiService.getTelemetryLogs()`).
 
-### 📌 Phần 2: Thiết kế Prompt đa bước & Bảng tiêu chí Rubric (Đang triển khai)
+### 📌 Phần 2: Thiết kế Prompt đa bước & Bảng tiêu chí Rubric (Đã hoàn thiện cốt lõi)
 - [x] **Grounding Dữ liệu Đo đạc thực tế:** Nhúng thông số Ground Truth từ tầng đo đạc cục bộ (WCAG 2.1, 60-30-10, diện tích chữ) vào `PersonaPrompt` để yêu cầu AI lập luận dựa trên bằng chứng khoa học cụ thể, triệt tiêu ảo giác.
-- [ ] **Xây dựng Rubric chấm điểm định lượng chuẩn hóa:** Thiết lập thang điểm 1-10 kèm định nghĩa cụ thể cho 6 tiêu chí (Sức hút 2s đầu, Thông điệp, Phân cấp chữ, Bố cục & Khoảng trắng, Nhận diện thương hiệu, Điểm rơi CTA).
-- [ ] **Tách nhỏ Prompt đa chặng (Multi-step Reasoning):** Chia nhỏ chuỗi xử lý thành các bước rõ ràng: Bóc tách thị giác -> Đối chiếu quy chuẩn Rubric -> Đề xuất tái thiết kế (Prompt Studio).
+- [x] **Xây dựng Rubric chấm điểm định lượng chuẩn hóa (`scoringService.js`):** Thiết lập thang điểm 1-10 kèm định nghĩa chi tiết cho 6 tiêu chí cốt lõi (Sức hút 2s đầu, Thông điệp, Phân cấp chữ, Bố cục & Khoảng trắng, Nhận diện thương hiệu, Điểm rơi CTA). Parser JSON schema bắt lỗi tự động, tính điểm trung bình có trọng số và gán kết luận Verdict (Xuất sắc / Tốt / Trung bình / Yếu).
+- [x] **Tách nhỏ Prompt đa chặng (Multi-step Reasoning):** Tách biệt quy trình thành các bước độc lập: Tổng quan trực giác 2 giây đầu (`image_overview`) -> Chấm điểm Rubric 6 tiêu chí (`rubric_score`) -> Mổ xẻ điểm nghẽn chuyển đổi (`weaknesses`) -> Hướng dẫn kỹ thuật khắc phục (`actionable`) -> Tái thiết kế sinh Prompt Gen AI (`redesign_prompt`).
 - [ ] **Few-shot Learning:** Tích hợp các ví dụ mẫu (ảnh đạt chuẩn vs ảnh vi phạm) vào ngữ cảnh.
 
 ### 📌 Phần 3: Bộ công cụ đo lường thị giác chạy cục bộ (Local Computer Vision Tools - Đã hoàn thiện cốt lõi)
@@ -87,9 +87,9 @@ flowchart TD
 - [ ] **Cơ chế RAG (Retrieval-Augmented Generation):** Đóng gói bộ 22 quy chuẩn thiết kế và chính sách quảng cáo của Meta/Google; truy xuất động đoạn quy chuẩn liên quan đưa vào System Prompt.
 - [ ] **Vòng lặp tối ưu hóa (Optimization Loop):** Đánh giá -> Đề xuất sửa đổi -> Mô phỏng chỉnh sửa (crop/đổi màu) -> Chấm điểm lại vòng 2.
 
-### 📌 Phần 5: Sản phẩm hoàn chỉnh & Công cụ hỗ trợ
-- [ ] **Chế độ so sánh đối đầu A/B (Side-by-Side Comparison):** Cho phép tải 2 bức ảnh banner cùng lúc, hiển thị bảng so sánh điểm trực tiếp xem mẫu nào tối ưu chuyển đổi hơn.
-- [ ] **Xuất báo cáo thẩm định (PDF Export):** Nút tải báo cáo chuyên nghiệp chuẩn PDF có đầy đủ điểm số, nhận xét và đề xuất kỹ thuật.
+### 📌 Phần 5: Sản phẩm hoàn chỉnh & Công cụ hỗ trợ (Đã tích hợp)
+- [x] **Chế độ so sánh đối đầu A/B (`compare_ab`):** Cho phép nạp 2 hoặc nhiều ảnh cùng lúc, kích hoạt luồng so sánh A/B trực quan theo 4 tiêu chí cốt lõi, tìm ra Winner và khuyến nghị hành động tối ưu CTR.
+- [x] **Xuất báo cáo thẩm định (PDF Export):** Tích hợp công cụ in/lưu báo cáo PDF chuyên nghiệp chuẩn `@media print` sạch đẹp (ẩn sidebar, phím bấm, nút chat; chỉ giữ lại ảnh, số liệu telemetry, bảng điểm Rubric và khuyến nghị của Art Director).
 
 ### 📌 Phần 6: Khối thực nghiệm và Đánh giá (Evaluation & Ablation Study)
 - [ ] **Thực nghiệm Ablation Study:**

@@ -296,6 +296,24 @@ const AppController = {
       return;
     }
 
+    // Chấm điểm định lượng Rubric 6 tiêu chí
+    if (actionKey === 'rubric_score') {
+      this.handleRubricScore();
+      return;
+    }
+
+    // So sánh đối đầu A/B giữa các hình ảnh
+    if (actionKey === 'compare_ab' || actionKey === 'compare') {
+      this.handleCompareAB();
+      return;
+    }
+
+    // Xuất báo cáo thẩm định dạng PDF
+    if (actionKey === 'export_pdf') {
+      this.handleExportPdf();
+      return;
+    }
+
     // Actionable fix quick actions (Vòng 5)
     const actionableKeys = ['fix_cta_color', 'fix_typography', 'fix_layout', 'platform_specs'];
     if (actionableKeys.includes(actionKey)) {
@@ -397,38 +415,47 @@ const AppController = {
   getNextActionsForTopic(topic) {
     const map = {
       first_impression: [
+        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
         { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
       ],
       strengths: [
+        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
         { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' }
       ],
       weaknesses: [
+        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
         { text: '🎨 Chỉnh màu nút CTA bật sáng', action: 'fix_cta_color' },
-        { text: '✍️ Sắp xếp lại bố cục chữ', action: 'fix_typography' }
+        { text: '✍️ Sắp xếp lại bố cục chữ', action: 'fix_typography' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
       ],
       fix_order: [
         { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
         { text: '✍️ Chỉnh bố cục chữ & khoảng cách', action: 'fix_typography' },
-        { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' }
+        { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
       ],
       platform_fb: [
         { text: '🤖 Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: '🎵 Tối ưu cho TikTok', action: 'platform_tiktok' }
+        { text: '🎵 Tối ưu cho TikTok', action: 'platform_tiktok' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
       ],
       platform_tiktok: [
         { text: '🤖 Tạo Prompt tái thiết kế', action: 'redesign_prompt' },
-        { text: '📱 Tối ưu cho Facebook', action: 'platform_fb' }
+        { text: '📱 Tối ưu cho Facebook', action: 'platform_fb' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
       ],
       redesign_prompt: [
-        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
-        { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' }
+        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' },
+        { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' }
       ],
       compare: [
-        { text: 'Người xem thấy gì trước?', action: 'first_impression' },
-        { text: 'Chỗ nào chưa ổn?', action: 'weaknesses' },
-        { text: 'Mình nên sửa gì trước?', action: 'fix_order' }
+        { text: '⚖️ So sánh A/B 2 ảnh', action: 'compare_ab' },
+        { text: '📊 Chấm điểm Rubric 6 tiêu chí', action: 'rubric_score' },
+        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
       ]
     };
     return map[topic] || [];
@@ -498,6 +525,176 @@ const AppController = {
     if (actionType !== 'fix_typography') nextActions.unshift({ text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' });
 
     await UIController.streamLines(lines, nextActions);
+  },
+
+  // ===========================================================================
+  // RUBRIC CHẤM ĐIỂM ĐỊNH LƯỢNG 6 TIÊU CHÍ (COMPOUND AI SYSTEM)
+  // ===========================================================================
+  async handleRubricScore() {
+    if (UIController.isAiTyping) return;
+    const apiKey = AdvConfig.getEffectiveApiKey();
+    if (!apiKey) {
+      if (window.SidebarController) window.SidebarController.openApiKeyModal();
+      return;
+    }
+
+    const img = this.state.activeImageData;
+    if (!img || !img.base64) {
+      await UIController.streamLines(["Bạn hãy gửi hình ảnh quảng cáo trước để mình chấm điểm theo Rubric 6 tiêu chí nhé!"]);
+      return;
+    }
+
+    const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
+    UIController.appendUserMessage("📊 Chấm điểm định lượng theo Rubric 6 tiêu chí", []);
+    UIController.showTypingIndicator("Đang đối chiếu 22 quy chuẩn và chấm điểm 6 tiêu chí...");
+
+    const featureSummary = (window.ImageFeatureExtractor && img.features)
+      ? window.ImageFeatureExtractor.formatFeatureSummary(img.features)
+      : "";
+
+    const scoringPrompt = PersonaPrompt.buildScoringPrompt(
+      featureSummary,
+      this.state.userPlatform,
+      this.state.userIndustry
+    );
+
+    let rawResponse = '';
+    try {
+      rawResponse = await ApiService.analyzeImage({
+        apiKey,
+        base64: img.base64,
+        mimeType: img.mimeType,
+        prompt: scoringPrompt,
+        systemPrompt: "Bạn là hệ thống chấm điểm định lượng hình ảnh quảng cáo chuyên nghiệp. Chỉ xuất định dạng JSON thuần theo schema được yêu cầu."
+      });
+    } catch (err) {
+      UIController.hideTypingIndicator();
+      this.showApiError(err.message, () => this.handleRubricScore());
+      return;
+    }
+
+    UIController.hideTypingIndicator();
+
+    // Parse score JSON bằng ScoringService
+    let scoreData = null;
+    if (window.ScoringService) {
+      scoreData = window.ScoringService.parseScoreResponse(rawResponse);
+    }
+
+    if (scoreData && window.ScoringService) {
+      // Lưu lại điểm vào activeImageData để persist
+      img.scoreData = scoreData;
+      const cardHtml = window.ScoringService.renderScoreCard(scoreData, img.fileName);
+      if (cardHtml && UIController.appendRawHtml) {
+        UIController.appendRawHtml(cardHtml);
+      }
+
+      const v = scoreData._verdictMeta || window.ScoringService.getVerdict(scoreData.total);
+      const lines = [
+        `Hoàn tất thẩm định định lượng cho ${callName}! Bức ảnh đạt **${scoreData.total.toFixed(1)}/10 điểm** (${v.label}).`,
+        `Bạn có thể xem chi tiết từng tiêu chí ở thẻ điểm phía trên hoặc bấm vào các nút bên dưới để mình hướng dẫn sửa ngay nhé!`
+      ];
+
+      // Tự động đồng bộ cập nhật session
+      try {
+        if (window.SidebarController) {
+          window.SidebarController.updateSessionData(this.state.currentSessionId, {
+            activeImageData: this.state.activeImageData
+          });
+        }
+      } catch (e) { }
+
+      const nextActions = [
+        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+        { text: '🎨 Hướng dẫn chỉnh màu nút CTA', action: 'fix_cta_color' },
+        { text: '✍️ Chỉnh bố cục chữ', action: 'fix_typography' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+      ];
+
+      await UIController.streamLines(lines, nextActions);
+    } else {
+      // Fallback
+      const lines = [
+        `Mình đã phân tích điểm định lượng cho ${callName}:`,
+        rawResponse
+      ];
+      await UIController.streamLines(lines, [
+        { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
+        { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+      ]);
+    }
+  },
+
+  // ===========================================================================
+  // SO SÁNH ĐỐI ĐẦU A/B GIỮA CÁC ẢNH (A/B TESTING MODE)
+  // ===========================================================================
+  async handleCompareAB() {
+    if (UIController.isAiTyping) return;
+    const apiKey = AdvConfig.getEffectiveApiKey();
+    if (!apiKey) {
+      if (window.SidebarController) window.SidebarController.openApiKeyModal();
+      return;
+    }
+
+    const callName = PersonaPrompt.getDynamicCallName(this.state.nameVariations, this.state.userName);
+    UIController.appendUserMessage("⚖️ So sánh đối đầu A/B giữa các hình ảnh", []);
+    UIController.showTypingIndicator("Đang phân tích đối chứng A/B thị giác...");
+
+    const promptText = `Hãy so sánh đối đầu A/B giữa các hình ảnh quảng cáo đã được gửi.
+Đánh giá chi tiết trên 4 tiêu chí cốt lõi:
+1. Sức hút thị giác trong 2 giây đầu (Bức nào giật mắt tốt hơn?)
+2. Độ rõ ràng thông điệp và ưu đãi chính (Bức nào truyền tải nhanh hơn?)
+3. Điểm rơi và độ tương phản nút CTA (Bức nào kích thích bấm mua hơn?)
+4. Phân cấp chữ và khoảng thở bố cục (Bức nào thoáng mắt và chuyên nghiệp hơn?)
+
+KẾT LUẬN:
+- Chọn rõ ràng 1 bức ảnh chiến thắng (Winner) và giải thích tại sao nó sẽ mang lại tỷ lệ chuyển đổi (CTR / Conversion Rate) cao hơn.
+- Nêu 2 hành động cụ thể để hoàn thiện bức ảnh chiến thắng trước khi bấm chạy chiến dịch.`;
+
+    let apiResponse = '';
+    try {
+      apiResponse = await ApiService.chatNextTurn({
+        apiKey,
+        text: promptText,
+        systemPrompt: PersonaPrompt.getSystemPrompt(callName, this.state.userIndustry, this.state.userPlatform),
+        conversationHistory: this.state.conversationHistory,
+        activeImageData: this.state.activeImageData
+      });
+    } catch (err) {
+      UIController.hideTypingIndicator();
+      this.showApiError(err.message, () => this.handleCompareAB());
+      return;
+    }
+
+    UIController.hideTypingIndicator();
+    this.state.conversationHistory.push({ role: 'user', text: promptText });
+    this.state.conversationHistory.push({ role: 'model', text: apiResponse });
+
+    const lines = apiResponse.split('\n')
+      .map(l => UIController.sanitizeStrictRules(l)).filter(l => l.length > 0);
+
+    const nextActions = [
+      { text: '📊 Bảng điểm Rubric 6 tiêu chí', action: 'rubric_score' },
+      { text: '🎨 Chỉnh màu nút CTA', action: 'fix_cta_color' },
+      { text: '🤖 Tạo Prompt AI vẽ lại ảnh', action: 'redesign_prompt' },
+      { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
+    ];
+
+    await UIController.streamLines(lines, nextActions);
+  },
+
+  // ===========================================================================
+  // XUẤT BÁO CÁO THẨM ĐỊNH (PDF EXPORT)
+  // ===========================================================================
+  handleExportPdf() {
+    const toast = document.createElement('div');
+    toast.className = 'fixed top-6 left-1/2 -translate-x-1/2 bg-[#181816] text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-xl z-[9999] border border-[#2C2B27] flex items-center gap-2';
+    toast.innerHTML = '<i class="fa-solid fa-print text-[#DA7756]"></i> Đang mở hộp thoại In... Chọn "Save as PDF" để xuất báo cáo thẩm định.';
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      window.print();
+      setTimeout(() => toast.remove(), 2000);
+    }, 400);
   },
 
   // Xử lý gửi tin nhắn người dùng
@@ -751,14 +948,17 @@ const AppController = {
         if (isLast) {
           if (sentImages.length > 1) {
             quickActions = [
-              { text: '⚖️ So sánh ảnh nào tốt hơn', action: 'compare' },
+              { text: '⚖️ So sánh A/B 2 ảnh', action: 'compare_ab' },
+              { text: '📊 Bảng điểm Rubric 6 tiêu chí', action: 'rubric_score' },
               { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-              { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
+              { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
             ];
           } else {
             quickActions = [
+              { text: '📊 Bảng điểm Rubric 6 tiêu chí', action: 'rubric_score' },
               { text: '🔴 Hạt sạn cản trở chuyển đổi', action: 'weaknesses' },
-              { text: '✨ Điểm sáng làm tốt', action: 'strengths' }
+              { text: '✨ Điểm sáng làm tốt', action: 'strengths' },
+              { text: '📄 Xuất báo cáo PDF', action: 'export_pdf' }
             ];
           }
         }
@@ -1000,6 +1200,17 @@ const AppController = {
       const telemetryHtml = window.ImageFeatureExtractor.renderTelemetryBadge(this.state.activeImageData.features);
       if (telemetryHtml && UIController.appendRawHtml) {
         UIController.appendRawHtml(telemetryHtml);
+      }
+    }
+
+    // Khôi phục thẻ điểm Rubric 6 tiêu chí nếu phiên đã từng chấm điểm
+    if (this.state.activeImageData?.scoreData && window.ScoringService) {
+      const scoreHtml = window.ScoringService.renderScoreCard(
+        this.state.activeImageData.scoreData,
+        this.state.activeImageData.fileName
+      );
+      if (scoreHtml && UIController.appendRawHtml) {
+        UIController.appendRawHtml(scoreHtml);
       }
     }
 

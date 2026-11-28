@@ -494,6 +494,79 @@ Sau đó hỏi ${callName} có muốn mình tạo Prompt AI để vẽ lại ả
     return prompts[actionType] || null;
   },
 
+  /**
+   * PROMPT CHẤM ĐIỂM RUBRIC ĐỊNH LƯỢNG (6 TIÊU CHÍ — TRẢ VỀ JSON THUẦN)
+   * Dùng riêng cho lần gọi API thứ 2 sau khi overview đã xong.
+   * Trả về JSON schema cứng để ScoringService.parseScoreResponse() xử lý.
+   */
+  buildScoringPrompt(featureSummary = "", platform = "", industry = "") {
+    const techCtx = featureSummary
+      ? `\n\n[DỮ LIỆU ĐO ĐẠC THỰC TẾ (GROUND TRUTH)]:\n${featureSummary}\n(Dùng các chỉ số này làm bằng chứng khách quan khi chấm điểm)`
+      : "";
+    const platformCtx = platform ? `\nKênh phân phối: ${platform}` : "";
+    const industryCtx = industry ? `\nNgành hàng: ${industry}` : "";
+
+    return `Hãy chấm điểm định lượng hình ảnh quảng cáo theo 6 tiêu chí dưới đây.${techCtx}${platformCtx}${industryCtx}
+
+RUBRIC CHẤM ĐIỂM (thang 1-10, bước 0.5):
+
+1. visual_impact (Sức hút thị giác 2 giây đầu)
+   - 9-10: Điểm rơi thị giác cực mạnh, chủ thể nổi bật tức thì, không cần đọc chữ vẫn hiểu sản phẩm
+   - 7-8:  Khá hấp dẫn, chủ thể rõ nhưng cần 1-2s để bắt kịp trọng tâm
+   - 5-6:  Trung bình, cần nhìn kỹ hoặc đọc chữ mới hiểu ý chính
+   - 3-4:  Yếu, nhiều yếu tố cạnh tranh nhau, ánh nhìn bị phân tán
+   - 1-2:  Rất yếu, không có điểm rơi rõ ràng, hỗn loạn thị giác
+
+2. message_clarity (Rõ ràng thông điệp)
+   - 9-10: Thông điệp cốt lõi truyền đạt ngay lập tức trong 1 lần nhìn, không mơ hồ
+   - 7-8:  Thông điệp rõ ràng nhưng cần đọc qua một lần
+   - 5-6:  Có thông điệp nhưng bị pha loãng bởi nội dung phụ
+   - 3-4:  Thông điệp mơ hồ, khó xác định ưu đãi/lợi ích chính
+   - 1-2:  Không có thông điệp rõ ràng
+
+3. text_hierarchy (Phân cấp chữ — Typography)
+   - 9-10: Phân cấp rõ ràng Tiêu đề > Phụ đề > CTA, kích thước và weight đúng vai trò
+   - 7-8:  Phân cấp tương đối ổn, có thể cải thiện 1-2 điểm nhỏ
+   - 5-6:  Phân cấp mờ nhạt, một số chữ bị lẫn vào nhau về kích thước/màu
+   - 3-4:  Chữ cùng kích thước/màu gây khó đọc, thiếu hệ thống
+   - 1-2:  Hỗn loạn chữ, không phân cấp
+
+4. layout_space (Bố cục & Khoảng thở — Negative Space)
+   - 9-10: Bố cục cân đối, khoảng thở đủ để mắt nghỉ, áp dụng đúng Rule of Thirds
+   - 7-8:  Bố cục khá tốt, một vài chỗ hơi chật hoặc lệch
+   - 5-6:  Bố cục có vấn đề: nhồi nhét hoặc thiếu khoảng thở ở một vùng quan trọng
+   - 3-4:  Nhồi nhét rõ rệt, không có khoảng thở, bố cục căng thẳng
+   - 1-2:  Hỗn loạn bố cục, không có trung tâm rõ ràng
+
+5. brand_identity (Nhận diện thương hiệu)
+   - 9-10: Logo/màu thương hiệu nhất quán, nhìn là biết ngay thương hiệu nào
+   - 7-8:  Có nhận diện thương hiệu nhưng không nổi bật
+   - 5-6:  Thương hiệu mờ nhạt, dễ nhầm với đối thủ
+   - 3-4:  Rất khó nhận ra thương hiệu, gần như không có hệ thống màu/logo
+   - 1-2:  Không có nhận diện thương hiệu
+
+6. cta_effectiveness (Điểm rơi CTA — Call To Action)
+   - 9-10: CTA nổi bật tức thì, tương phản ≥ 4.5:1, vị trí đúng vùng thị giác chính
+   - 7-8:  CTA khá rõ, cần tinh chỉnh màu hoặc vị trí thêm một chút
+   - 5-6:  CTA có nhưng bị lẫn vào nền hoặc đặt sai vùng thị giác
+   - 3-4:  CTA rất khó nhận ra, màu trùng nền hoặc quá nhỏ
+   - 1-2:  Không có CTA hoặc CTA hoàn toàn vô hiệu
+
+QUAN TRỌNG: Chỉ trả về JSON thuần, KHÔNG thêm bất kỳ văn bản giải thích nào bên ngoài JSON.
+Định dạng bắt buộc:
+{
+  "scores": {
+    "visual_impact":     { "score": <số 1-10>, "reason": "<nhận xét ngắn tiếng Việt dưới 60 từ>", "evidence": "<dẫn chứng từ ảnh hoặc từ Ground Truth>" },
+    "message_clarity":   { "score": <số 1-10>, "reason": "<nhận xét ngắn tiếng Việt dưới 60 từ>", "evidence": "<dẫn chứng từ ảnh hoặc từ Ground Truth>" },
+    "text_hierarchy":    { "score": <số 1-10>, "reason": "<nhận xét ngắn tiếng Việt dưới 60 từ>", "evidence": "<dẫn chứng từ ảnh hoặc từ Ground Truth>" },
+    "layout_space":      { "score": <số 1-10>, "reason": "<nhận xét ngắn tiếng Việt dưới 60 từ>", "evidence": "<dẫn chứng từ ảnh hoặc từ Ground Truth>" },
+    "brand_identity":    { "score": <số 1-10>, "reason": "<nhận xét ngắn tiếng Việt dưới 60 từ>", "evidence": "<dẫn chứng từ ảnh hoặc từ Ground Truth>" },
+    "cta_effectiveness": { "score": <số 1-10>, "reason": "<nhận xét ngắn tiếng Việt dưới 60 từ>", "evidence": "<dẫn chứng từ ảnh hoặc từ Ground Truth>" }
+  },
+  "total": <trung bình có trọng số, làm tròn 1 chữ số thập phân>
+}`;
+  },
+
   // Lấy tên ngẫu nhiên trong danh sách biến thể để xưng hô tự nhiên
   getDynamicCallName(variations, fallbackName = "bạn") {
     if (!variations || variations.length === 0) {

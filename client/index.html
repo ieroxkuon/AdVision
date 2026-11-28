@@ -107,6 +107,167 @@
     #btn-eye-logo:hover {
       transform: scale(1.05);
     }
+
+    /* =====================================================================
+       ADVISION RUBRIC SCORE CARD & A/B TESTING & PRINT STYLES
+       ===================================================================== */
+    .adv-score-card {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid #E5E2D9;
+      border-radius: 1rem;
+      padding: 1rem 1.25rem;
+      margin: 0.75rem 0;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 14px -2px rgba(0,0,0,0.04);
+      max-width: 680px;
+    }
+    .dark .adv-score-card {
+      background: rgba(32, 32, 29, 0.7);
+      border-color: #2C2B27;
+      box-shadow: 0 4px 14px -2px rgba(0,0,0,0.3);
+    }
+    .adv-score-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px dashed #E5E2D9;
+    }
+    .dark .adv-score-header {
+      border-bottom-color: #2C2B27;
+    }
+    .adv-score-circle {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      border: 3px solid var(--ring, #DA7756);
+      background: rgba(218, 119, 86, 0.08);
+      flex-shrink: 0;
+    }
+    .adv-score-total {
+      font-size: 1.15rem;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .adv-score-of {
+      font-size: 0.6rem;
+      color: #9A9892;
+      font-weight: 600;
+    }
+    .adv-score-verdict {
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+    .adv-score-file {
+      font-size: 0.7rem;
+      color: #6E6D69;
+    }
+    .dark .adv-score-file {
+      color: #9A9892;
+    }
+    .adv-score-rows {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 0.5rem 1rem;
+      margin-top: 0.75rem;
+    }
+    .adv-score-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.75rem;
+    }
+    .adv-score-label {
+      width: 140px;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      color: #1F1E1D;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .dark .adv-score-label {
+      color: #EDECE8;
+    }
+    .adv-score-icon {
+      font-size: 0.85rem;
+    }
+    .adv-score-bar-wrap {
+      flex: 1;
+      height: 6px;
+      background: #E5E2D9;
+      border-radius: 9999px;
+      overflow: hidden;
+    }
+    .dark .adv-score-bar-wrap {
+      background: #2C2B27;
+    }
+    .adv-score-bar-fill {
+      height: 100%;
+      border-radius: 9999px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .adv-score-num {
+      width: 24px;
+      text-align: right;
+      font-weight: 700;
+      font-size: 0.75rem;
+    }
+    .adv-score-footer {
+      margin-top: 0.75rem;
+      padding-top: 0.5rem;
+      border-top: 1px solid #E5E2D9;
+      font-size: 0.65rem;
+      color: #9A9892;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .dark .adv-score-footer {
+      border-top-color: #2C2B27;
+    }
+
+    /* A/B Comparison Card */
+    .adv-ab-card {
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid #E5E2D9;
+      border-radius: 1rem;
+      padding: 1.25rem;
+      margin: 0.75rem 0;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 14px -2px rgba(0,0,0,0.04);
+      max-width: 720px;
+    }
+    .dark .adv-ab-card {
+      background: rgba(32, 32, 29, 0.7);
+      border-color: #2C2B27;
+    }
+
+    /* Print styles for PDF export */
+    @media print {
+      body {
+        background: #fff !important;
+        color: #000 !important;
+      }
+      #sidebar, #btn-eye-logo, .chat-input-container, #header-status-area, .quick-actions-wrap, button {
+        display: none !important;
+      }
+      #chat-container {
+        padding: 0 !important;
+        max-width: 100% !important;
+      }
+      .adv-score-card, .adv-ab-card {
+        box-shadow: none !important;
+        border: 1px solid #ccc !important;
+        break-inside: avoid;
+      }
+    }
   </style>
 </head>
 <body class="h-full flex bg-claudeBg text-claudeText dark:bg-claudeDarkBg dark:text-claudeDarkText antialiased selection:bg-claudeCoral selection:text-white">
@@ -411,6 +572,7 @@
   <script src="js/rulesService.js"></script>
   <script src="js/imageFeatureExtractor.js"></script>
   <script src="js/personaPrompt.js"></script>
+  <script src="js/scoringService.js"></script>
   <script src="js/redesignGenerator.js"></script>
   <script src="js/apiService.js"></script>
   <script src="js/router.js"></script>
